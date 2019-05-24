@@ -16,30 +16,20 @@
    You should have received a copy of the GNU General Public License
    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
-
-#include <stdlib.h>
 #include <stdio.h>
-#include <string.h>
+
 #ifdef _WIN32
-#define WINVER 0x0400
-#include <windows.h>
-#include <winsock.h>
-#include <time.h>
-#define DIR int
+# define WINVER 0x0400
+# include <windows.h>
+# include <winsock.h>
+# define DIR int
 #else
-#include <dirent.h>
-#include <sys/time.h>
-#ifdef HAVE_SYS_SELECT_H
-#include <sys/select.h>
-#else
-#include <sys/types.h>
-#include <unistd.h>
+# include <dirent.h>
+# include <sys/time.h>
+# include <sys/types.h>
+# include <unistd.h>
 #endif
-#endif
-#include <limits.h>		/* PATH_MAX */
-#ifdef HAVE_SYSEXITS_H
-#include <sysexits.h>
-#endif
+
 
 /* standard exit codes */
 #ifndef EX_OK

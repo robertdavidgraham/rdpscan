@@ -22,6 +22,10 @@
 
 #include "rdesktop.h"
 #include "ssl.h"
+#include "util-xmalloc.h"
+#include "util-log.h"
+
+#include <string.h>
 
 extern char *g_username;
 extern char g_hostname[16];

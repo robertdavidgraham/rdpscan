@@ -20,6 +20,8 @@
 
 #include "rdesktop.h"
 #include "ssl.h"
+#include "util-log.h"
+#include <string.h>
 
 void
 rdssl_sha1_init(RDSSL_SHA1 * sha1)
@@ -151,7 +153,10 @@ rdssl_cert_to_rkey(RDSSL_CERT * cert, uint32 * key_len)
 	X509_ALGOR *algor = NULL;
 
 	key = X509_get_X509_PUBKEY(cert);
-	algor = X509_PUBKEY_get0_param(NULL, NULL, 0, &algor, key); /*FIXME*/
+    
+    /* (Rob) It looks like this code can't work, as the return type
+     * is wrong. FIXME TODO */
+	X509_PUBKEY_get0_param(NULL, NULL, 0, &algor, key);
 
 	nid = OBJ_obj2nid(algor->algorithm);
 
@@ -209,8 +214,8 @@ rdssl_rkey_get_exp_mod(RDSSL_RKEY * rkey, uint8 * exponent, uint32 max_exp_len, 
 {
 	int len;
 
-	BIGNUM *e = NULL;
-	BIGNUM *n = NULL;
+	const BIGNUM *e = NULL;
+	const BIGNUM *n = NULL;
 
 #if OPENSSL_VERSION_NUMBER < 0x10100000L
 	e = rkey->e;

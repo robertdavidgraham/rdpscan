@@ -20,6 +20,10 @@
 */
 
 #include "rdesktop.h"
+#include "util-log.h"
+#include "tcp.h"
+
+#include <string.h>
 
 extern RD_BOOL g_encryption;
 extern RD_BOOL g_encryption_initial;

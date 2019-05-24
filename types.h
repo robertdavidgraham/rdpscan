@@ -17,6 +17,12 @@
    You should have received a copy of the GNU General Public License
    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
+#ifndef RDESK_TYPES_H
+#define RDESK_TYPES_H
+#include "stream.h"
+#include "constants.h"
+#include <dirent.h>
+#include <limits.h>
 
 typedef int RD_BOOL;
 
@@ -276,9 +282,6 @@ typedef struct notify_data
 }
 NOTIFY;
 
-#ifndef PATH_MAX
-#define PATH_MAX 256
-#endif
 
 typedef struct fileinfo
 {
@@ -294,3 +297,6 @@ typedef struct fileinfo
 FILEINFO;
 
 typedef RD_BOOL(*str_handle_lines_t) (const char *line, void *data);
+
+#endif
+

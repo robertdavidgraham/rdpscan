@@ -25,6 +25,8 @@
 /* *INDENT-OFF* */
 
 #include "rdesktop.h"
+#include "util-log.h"
+#include "bitmap.h"
 
 #define CVAL(p)   (*(p++))
 #ifdef NEED_ALIGN

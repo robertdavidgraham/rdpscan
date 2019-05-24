@@ -1,20 +1,16 @@
 //struct stream {int x;}
 #include "rdesktop.h"
 #include "orders.h"
-#include <string.h>
-#include <stdlib.h>
-#include <stdarg.h>
-#include <unistd.h>
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <fcntl.h>
+#include "mst120.h"
+#include "tcp.h"
+
 
 uint8 g_static_rdesktop_salt_16[16] = {
     0xb8, 0x82, 0x29, 0x31, 0xc5, 0x39, 0xd9, 0x44,
     0x54, 0x15, 0x5e, 0x14, 0x71, 0x38, 0xd5, 0x4d
 };
 
-char g_title[64] = "";
+//char g_title[64] = "";
 char g_password[64] = "";
 char g_hostname[16] = "";
 char g_keymapname[PATH_MAX] = "";
@@ -121,123 +117,7 @@ save_licence(unsigned char *data, int length)
 
 }
 
-void *
-xmalloc(int size)
-{
-    void *mem = malloc(size);
-    if (mem == NULL)
-    {
-        error("xmalloc %d\n", size);
-        exit(EX_UNAVAILABLE);
-    }
-    return mem;
-}
 
-/* Exit on NULL pointer. Use to verify result from XGetImage etc */
-void
-exit_if_null(void *ptr)
-{
-    if (ptr == NULL)
-    {
-        error("unexpected null pointer. Out of memory?\n");
-        exit(EX_UNAVAILABLE);
-    }
-}
-
-/* strdup */
-char *
-xstrdup(const char *s)
-{
-    char *mem = strdup(s);
-    if (mem == NULL)
-    {
-        perror("strdup");
-        exit(EX_UNAVAILABLE);
-    }
-    return mem;
-}
-
-/* realloc; exit if out of memory */
-void *
-xrealloc(void *oldmem, size_t size)
-{
-    void *mem;
-    
-    if (size == 0)
-        size = 1;
-    mem = realloc(oldmem, size);
-    if (mem == NULL)
-    {
-        error("xrealloc %ld\n", size);
-        exit(EX_UNAVAILABLE);
-    }
-    return mem;
-}
-
-/* free */
-void
-xfree(void *mem)
-{
-    free(mem);
-}
-
-/* report an error */
-void
-error(char *format, ...)
-{
-    va_list ap;
-    
-    fprintf(stderr, "[-] ");
-    
-    va_start(ap, format);
-    vfprintf(stderr, format, ap);
-    va_end(ap);
-}
-
-/* report a warning */
-void
-warning(char *format, ...)
-{
-    va_list ap;
-    
-    fprintf(stderr, "[ ] ");
-    
-    va_start(ap, format);
-    vfprintf(stderr, format, ap);
-    va_end(ap);
-}
-
-/* report an unimplemented protocol feature */
-void
-unimpl(char *format, ...)
-{
-    va_list ap;
-    
-    fprintf(stderr, "[-] NOT IMPLEMENTED: ");
-    
-    va_start(ap, format);
-    vfprintf(stderr, format, ap);
-    va_end(ap);
-}
-
-/* Generate a 32-byte random for the secure transport code. */
-void
-generate_random(uint8 * random)
-{
-    int fd;
-    ssize_t n;
-    
-    /* If we have a kernel random device, try that first */
-    if (((fd = open("/dev/urandom", O_RDONLY)) != -1)
-        || ((fd = open("/dev/random", O_RDONLY)) != -1))
-    {
-        n = read(fd, random, 32);
-        close(fd);
-        if (n == 32)
-            return;
-    }
-    
-}
 
 /* My custom globals */
 char *g_username = "rdpscan";
@@ -248,7 +128,6 @@ int main(int argc, char *argv[])
     char domain[32] = "";
     char shell[32] = "";
     char directory[32] = "";
-    char g_password[32] = "";
     RD_BOOL g_reconnect_loop = False;
     int i;
     
@@ -289,7 +168,7 @@ int main(int argc, char *argv[])
         
         {
             RD_BOOL deactivated = False;
-            uint32_t ext_disc_reason = 0;
+            unsigned ext_disc_reason = 0;
             g_reconnect_loop = False;
             rdp_main_loop(&deactivated, &ext_disc_reason);
         }

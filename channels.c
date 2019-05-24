@@ -19,6 +19,10 @@
 */
 
 #include "rdesktop.h"
+#include "util-xmalloc.h"
+#include "util-log.h"
+
+#include <string.h>
 
 #define MAX_CHANNELS			6
 #define CHANNEL_CHUNK_LENGTH		1600

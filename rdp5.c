@@ -19,6 +19,9 @@
 */
 
 #include "rdesktop.h"
+#include "util-xmalloc.h"
+#include "util-log.h"
+#include <string.h>
 
 extern uint8 *g_next_packet;
 

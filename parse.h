@@ -18,23 +18,6 @@
    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-/* Parser state */
-typedef struct stream
-{
-	unsigned char *p;
-	unsigned char *end;
-	unsigned char *data;
-	unsigned int size;
-
-	/* Offsets of various headers */
-	unsigned char *iso_hdr;
-	unsigned char *mcs_hdr;
-	unsigned char *sec_hdr;
-	unsigned char *rdp_hdr;
-	unsigned char *channel_hdr;
-
-}
- *STREAM;
 
 #define s_push_layer(s,h,n)	{ (s)->h = (s)->p; (s)->p += n; }
 #define s_pop_layer(s,h)	(s)->p = (s)->h;

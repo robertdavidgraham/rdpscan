@@ -1,14 +1,21 @@
-#include <stdio.h>
-#include <time.h>
-#include <unistd.h>
 #include "rdesktop.h"
+#include "util-xmalloc.h"
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <time.h>
+
+#ifndef WIN32
+#include <unistd.h>
+#endif
 
 #define MST120_SEND_MAX 5
 #define MST120_TIMEOUT 5  // in seconds
 
 static VCHANNEL *mst120_channel;
 static int check_count;
-static int first_check;
+static time_t first_check;
 
 static void
 mst120_process(STREAM s)
@@ -36,7 +43,7 @@ mst120_send_check_packet(size_t size, size_t offset)
 {
     printf("[+] Sending MS_T120 check packet (size: 0x%lx - offset: 0x%lx)\n", size, offset);
 
-    char *buff = (char*)malloc(size);
+    char *buff = xmalloc(size);
 
     if (!buff)
         return;
@@ -50,7 +57,7 @@ mst120_send_check_packet(size_t size, size_t offset)
     s_mark_end(s);
     channel_send(s, mst120_channel);
 
-    free(buff);
+    xfree(buff);
 }
 
 void
@@ -61,7 +68,7 @@ mst120_check()
         printf("[-] Max sends reached, please wait for race condition to be sure...\n");
         while (1)
         {
-            int now = time(0);
+            time_t now = time(0);
 
             if (first_check == 0)
             {

@@ -18,6 +18,7 @@
 */
 
 #include "rdesktop.h"
+#include "util-log.h"
 
 
 /* Parse an ASN.1 BER header */

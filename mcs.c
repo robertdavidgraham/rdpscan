@@ -19,6 +19,10 @@
 */
 
 #include "rdesktop.h"
+#include "asn.h"
+#include "util-log.h"
+#include <stdlib.h>
+#include <string.h>
 
 uint16 g_mcs_userid;
 extern VCHANNEL g_channels[];

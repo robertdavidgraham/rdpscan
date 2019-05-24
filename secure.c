@@ -20,6 +20,11 @@
 
 #include "rdesktop.h"
 #include "ssl.h"
+#include "util-xmalloc.h"
+#include "util-log.h"
+#include "util-genrand.h"
+
+#include <string.h>
 
 extern char g_hostname[16];
 extern int g_width;

@@ -20,6 +20,18 @@
 */
 #define IPv6
 
+#include "rdesktop.h"
+#include "util-xmalloc.h"
+#include "util-log.h"
+
+
+#include <string.h>
+#include <errno.h>
+
+#include <openssl/ssl.h>
+#include <openssl/x509.h>
+#include <openssl/err.h>
+
 #ifndef _WIN32
 #include <unistd.h>		/* select read write close */
 #include <sys/socket.h>		/* socket connect setsockopt */
@@ -28,14 +40,9 @@
 #include <netinet/in.h>		/* sockaddr_in */
 #include <netinet/tcp.h>	/* TCP_NODELAY */
 #include <arpa/inet.h>		/* inet_addr */
-#include <errno.h>		/* errno */
 #endif
 
-#include "openssl/ssl.h"
-#include "openssl/x509.h"
-#include "openssl/err.h"
 
-#include "rdesktop.h"
 
 #ifdef _WIN32
 #define socklen_t int

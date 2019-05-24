@@ -19,6 +19,11 @@
 
 #include "rdesktop.h"
 #include "orders.h"
+#include "mst120.h"
+#include "util-xmalloc.h"
+#include "util-log.h"
+
+#include <string.h>
 
 extern uint8 *g_next_packet;
 static RDP_ORDER_STATE g_order_state;
@@ -921,7 +926,7 @@ process_text2(STREAM s, TEXT2_ORDER * os, uint32 present, RD_BOOL delta)
 static void
 process_raw_bmpcache(STREAM s)
 {
-	RD_HBITMAP bitmap;
+	//RD_HBITMAP bitmap;
 	uint16 cache_idx, bufsize;
 	uint8 cache_id, width, height, bpp, Bpp;
 	uint8 *data, *inverted;
@@ -956,7 +961,7 @@ process_raw_bmpcache(STREAM s)
 static void
 process_bmpcache(STREAM s)
 {
-	RD_HBITMAP bitmap;
+	//RD_HBITMAP bitmap;
 	uint16 cache_idx, size;
 	uint8 cache_id, width, height, bpp, Bpp;
 	uint8 *data, *bmpdata;

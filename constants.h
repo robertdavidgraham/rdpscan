@@ -16,6 +16,8 @@
    You should have received a copy of the GNU General Public License
    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
+#ifndef RDESK_CONSTANTS_H
+#define RDESK_CONSTANTS_H
 
 /* TCP port for Remote Desktop Protocol */
 #define TCP_PORT_RDP 3389
@@ -543,3 +545,6 @@ enum RDP_PDU_REDIRECT_FLAGS
 	PDU_REDIRECT_HAS_TARGET_NETBIOS = 0x200,
 	PDU_REDIRECT_HAS_TARGET_IP_ARRAY = 0x800
 };
+
+#endif
+
