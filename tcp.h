@@ -4,6 +4,9 @@
 #include "stream.h"
 #include "types.h"
 
+extern char g_targetaddr[];
+extern char g_targetport[];
+
 /* tcp.c */
 STREAM tcp_init(uint32 maxlen);
 void tcp_send(STREAM s);

@@ -17,7 +17,7 @@
    You should have received a copy of the GNU General Public License
    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
-
+#define _CRT_SECURE_NO_WARNINGS 1
 #include "rdesktop.h"
 #include "ssl.h"
 #include "util-xmalloc.h"
@@ -25,6 +25,7 @@
 #include "util-genrand.h"
 
 #include <string.h>
+
 
 extern char g_hostname[16];
 extern int g_width;
@@ -402,6 +403,7 @@ sec_out_mcs_data(STREAM s, uint32 selected_protocol)
 	int hostlen = 2 * (int)strlen(g_hostname);
 	int length = 162 + 76 + 12 + 4;
 	unsigned int i;
+    uint32 cluster_flags;
 
 	if (g_num_channels > 0)
 		length += g_num_channels * 12 + 8;
@@ -460,7 +462,7 @@ sec_out_mcs_data(STREAM s, uint32 selected_protocol)
 	out_uint32_le(s, selected_protocol);	/* End of client info */
 
 	/* Write a Client Cluster Data (TS_UD_CS_CLUSTER) */
-	uint32 cluster_flags = 0;
+	cluster_flags = 0;
 	out_uint16_le(s, SEC_TAG_CLI_CLUSTER);	/* header.type */
 	out_uint16_le(s, 12);	/* length */
 
@@ -738,7 +740,12 @@ sec_process_crypt_info(STREAM s)
 static void
 sec_process_srv_info(STREAM s)
 {
+    extern char g_targetaddr[];
+    extern char g_targetport[];
+    uint16 minor;
 	in_uint16_le(s, g_server_rdp_version);
+	in_uint16_le(s, minor);
+    fprintf(stderr, "[+] [%s]:%s v%u.%u\n", g_targetaddr, g_targetport, g_server_rdp_version, minor);
 	DEBUG_RDP5(("Server RDP version is %d\n", g_server_rdp_version));
 	if (1 == g_server_rdp_version)
 	{

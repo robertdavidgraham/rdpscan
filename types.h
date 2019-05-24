@@ -21,8 +21,17 @@
 #define RDESK_TYPES_H
 #include "stream.h"
 #include "constants.h"
-#include <dirent.h>
 #include <limits.h>
+#include <time.h>
+#ifdef WIN32
+typedef int DIR;
+#else
+#include <dirent.h>
+#endif
+
+#ifndef PATH_MAX
+#define PATH_MAX 256
+#endif
 
 typedef int RD_BOOL;
 

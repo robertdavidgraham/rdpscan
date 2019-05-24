@@ -34,7 +34,11 @@ exit_if_null(void *ptr)
 char *
 xstrdup(const char *s)
 {
-    char *mem = strdup(s);
+    char *mem;
+#ifdef WIN32
+#define strdup(x) _strdup(x)
+#endif
+    mem = strdup(s);
     if (mem == NULL)
     {
         perror("strdup");

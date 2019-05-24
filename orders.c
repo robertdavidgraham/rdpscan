@@ -19,6 +19,7 @@
 
 #include "rdesktop.h"
 #include "orders.h"
+#include "bitmap.h"
 #include "mst120.h"
 #include "util-xmalloc.h"
 #include "util-log.h"
@@ -1381,6 +1382,7 @@ process_orders(STREAM s, uint16 num_orders)
 
 			delta = order_flags & RDP_ORDER_DELTA;
 
+            fprintf(stderr, "[+] order = %u\n", os->order_type);
 			switch (os->order_type)
 			{
 				case RDP_ORDER_DESTBLT:

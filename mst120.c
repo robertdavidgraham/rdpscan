@@ -41,18 +41,16 @@ mst120_check_init()
 void
 mst120_send_check_packet(size_t size, size_t offset)
 {
-    printf("[+] Sending MS_T120 check packet (size: 0x%lx - offset: 0x%lx)\n", size, offset);
-
     char *buff = xmalloc(size);
+    STREAM s;
 
-    if (!buff)
-        return;
+    printf("[+] Sending MS_T120 check packet (size: 0x%lx - offset: 0x%lx)\n", size, offset);
 
     memset(buff, 0, size);
 
     buff[offset] = 2;
 
-    STREAM s = channel_init(mst120_channel, (unsigned)size);
+    s = channel_init(mst120_channel, (unsigned)size);
     out_uint8p(s, buff, size);
     s_mark_end(s);
     channel_send(s, mst120_channel);

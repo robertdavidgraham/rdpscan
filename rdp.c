@@ -18,8 +18,10 @@
    You should have received a copy of the GNU General Public License
    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
+#define _CRT_SECURE_NO_WARNINGS 1
 #include "util-xmalloc.h"
 #include "util-log.h"
+#include "bitmap.h"
 #include "tcp.h"
 
 #include <time.h>
@@ -173,7 +175,7 @@ rdp_send_data(STREAM s, uint8 data_pdu_type)
 	uint16 length;
 
 	s_pop_layer(s, rdp_hdr);
-	length = s->end - s->p;
+	length = (uint16)(s->end - s->p);
 
 	out_uint16_le(s, length);
 	out_uint16_le(s, (RDP_PDU_DATA | 0x10));
@@ -321,7 +323,7 @@ rdp_in_unistr(STREAM s, int in_len, char **string, uint32 * str_size)
 	else
 #endif
 	{
-		int i = 0;
+		unsigned i = 0;
 		int rem = 0;
 		uint32 len = in_len / 2;
 
@@ -490,15 +492,15 @@ rdp_send_logon_info(uint32 flags, char *domain, char *user,
 
 		/* TS_TIME_ZONE_INFORMATION */
 		tzone = (mktime(gmtime(&t)) - mktime(localtime(&t))) / 60;
-		out_uint32_le(s, (uint32_t)tzone);
-		rdp_out_unistr(s, "GTB, normaltid", 2 * strlen("GTB, normaltid"));
+		out_uint32_le(s, (uint32)tzone);
+		rdp_out_unistr(s, "GTB, normaltid", 2 * (int)strlen("GTB, normaltid"));
 		out_uint8s(s, 62 - 2 * strlen("GTB, normaltid"));
 		out_uint32_le(s, 0x0a0000);
 		out_uint32_le(s, 0x050000);
 		out_uint32_le(s, 3);
 		out_uint32_le(s, 0);
 		out_uint32_le(s, 0);
-		rdp_out_unistr(s, "GTB, sommartid", 2 * strlen("GTB, sommartid"));
+		rdp_out_unistr(s, "GTB, sommartid", 2 * (int)strlen("GTB, sommartid"));
 		out_uint8s(s, 62 - 2 * strlen("GTB, sommartid"));
 		out_uint32_le(s, 0x30000);
 		out_uint32_le(s, 0x050000);

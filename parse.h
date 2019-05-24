@@ -32,7 +32,7 @@
 #define in_uint16_le(s,v)	{ v = *(uint16 *)((s)->p); (s)->p += 2; }
 #define in_uint32_le(s,v)	{ v = *(uint32 *)((s)->p); (s)->p += 4; }
 #define out_uint16_le(s,v)	{ *(uint16 *)((s)->p) = v; (s)->p += 2; }
-#define out_uint32_le(s,v)	{ *(uint32 *)((s)->p) = v; (s)->p += 4; }
+#define out_uint32_le(s,v)	{ *(unsigned *)((s)->p) = v; (s)->p += 4; }
 
 #else
 #define in_uint16_le(s,v)	{ v = *((s)->p++); v += *((s)->p++) << 8; }

@@ -2,7 +2,7 @@
 #define RDESK_BITMAP_H
 
 /* bitmap.c */
-RD_BOOL bitmap_decompress(uint8 * output, int width, int height, uint8 * input, int size, int Bpp);
+int bitmap_decompress(unsigned char * output, int width, int height, unsigned char * input, int size, int Bpp);
 
 #endif
 

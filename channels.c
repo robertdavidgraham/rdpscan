@@ -17,7 +17,7 @@
    You should have received a copy of the GNU General Public License
    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
-
+#define _CRT_SECURE_NO_WARNINGS 1
 #include "rdesktop.h"
 #include "util-xmalloc.h"
 #include "util-log.h"
@@ -51,6 +51,7 @@ channel_register(char *name, uint32 flags, void (*callback) (STREAM))
 {
 	VCHANNEL *channel;
 
+    fprintf(stderr, "[+] register channel: \"%s\"\n", name);
 	if (g_rdp_version < RDP_V5)
 		return NULL;
 

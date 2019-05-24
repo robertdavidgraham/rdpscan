@@ -168,7 +168,7 @@ iso_send(STREAM s)
 	uint16 length;
 
 	s_pop_layer(s, iso_hdr);
-	length = s->end - s->p;
+	length = (uint16)(s->end - s->p);
 
 	out_uint8(s, 3);	/* version */
 	out_uint8(s, 0);	/* reserved */
@@ -321,7 +321,7 @@ iso_connect(char *server, char *username, char *domain, char *password,
 			}
 			/* do not use encryption when using TLS */
 			g_encryption = False;
-			fprintf(stderr, "[+] Connection established using SSL.\n");
+		    fprintf(stderr, "[+] [%s]:%s connection established using SSL\n", g_targetaddr, g_targetport);
 		}
 #ifdef WITH_CREDSSP
 		else if (data == PROTOCOL_HYBRID)

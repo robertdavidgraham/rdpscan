@@ -46,8 +46,9 @@ void
 hexdump(unsigned char *p, unsigned int len)
 {
     unsigned char *line = p;
-    int i, thisline, offset = 0;
-    
+    int i, thisline;
+    unsigned offset = 0;
+    return;
     while (offset < len)
     {
         printf("%04x ", offset);

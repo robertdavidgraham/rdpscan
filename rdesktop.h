@@ -18,18 +18,15 @@
 */
 #include <stdio.h>
 
+#if 0
 #ifdef _WIN32
-# define WINVER 0x0400
-# include <windows.h>
-# include <winsock.h>
-# define DIR int
 #else
 # include <dirent.h>
 # include <sys/time.h>
 # include <sys/types.h>
 # include <unistd.h>
 #endif
-
+#endif
 
 /* standard exit codes */
 #ifndef EX_OK
@@ -110,6 +107,7 @@
 #define EXRD_WINDOW_CLOSED 62
 #define EXRD_UNKNOWN 63
 
+#define WITH_DEBUG 1
 #ifdef WITH_DEBUG
 #define DEBUG(args)	printf args;
 #else

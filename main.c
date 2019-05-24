@@ -3,7 +3,8 @@
 #include "orders.h"
 #include "mst120.h"
 #include "tcp.h"
-
+#include "util-time.h"
+#include "util-xmalloc.h"
 
 uint8 g_static_rdesktop_salt_16[16] = {
     0xb8, 0x82, 0x29, 0x31, 0xc5, 0x39, 0xd9, 0x44,
@@ -12,7 +13,7 @@ uint8 g_static_rdesktop_salt_16[16] = {
 
 //char g_title[64] = "";
 char g_password[64] = "";
-char g_hostname[16] = "";
+char g_hostname[16] = "kali";
 char g_keymapname[PATH_MAX] = "";
 unsigned int g_keylayout = 0x409;    /* Defaults to US keyboard layout */
 int g_keyboard_type = 0x4;    /* Defaults to US keyboard layout */
@@ -122,6 +123,24 @@ save_licence(unsigned char *data, int length)
 /* My custom globals */
 char *g_username = "rdpscan";
 
+/**
+ * Generate a random username on startup, because systems reject
+ * repeated use of the same username
+ */
+void randomize_username(void)
+{
+    unsigned long long x = util_nanotime();
+    size_t i;
+
+    g_username = xmalloc(10);
+
+    for (i=0; i<8 && x; i++, x /= 32) {
+        static const char chars[] = "abcdfghijklmnopqrsuvwxyz0123456789";
+        g_username[i] = chars[x % 32];
+    }
+    g_username[i] = '\0';
+}
+
 int main(int argc, char *argv[])
 {
     unsigned flags = 0;
@@ -130,7 +149,7 @@ int main(int argc, char *argv[])
     char directory[32] = "";
     RD_BOOL g_reconnect_loop = False;
     int i;
-    
+
     flags = RDP_INFO_MOUSE | RDP_INFO_DISABLECTRLALTDEL
      | RDP_INFO_UNICODE | RDP_INFO_MAXIMIZESHELL | RDP_INFO_ENABLEWINDOWSKEY;
     
@@ -138,6 +157,8 @@ int main(int argc, char *argv[])
         fprintf(stderr, "Usage:\n rdpscan <target>\n");
         return 1;
     }
+
+    randomize_username();
     
     if (!mst120_check_init())
     {

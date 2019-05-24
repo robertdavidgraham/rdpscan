@@ -18,6 +18,30 @@
    You should have received a copy of the GNU General Public License
    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
+#define _CRT_SECURE_NO_WARNINGS 1
+#ifdef WIN32
+#define WIN32_LEAN_AND_MEAN 
+#if defined(_MSC_VER)
+#pragma comment(lib, "Ws2_32.lib")
+//#pragma comment(lib, "openssl.lib")
+#pragma comment(lib, "libssl.lib")
+#pragma comment(lib, "libcrypto.lib")
+#endif
+#include <WinSock2.h>
+#include <WS2tcpip.h>
+#include <intrin.h>
+#include <process.h>
+#define snprintf _snprintf
+#else
+#include <unistd.h>		/* select read write close */
+#include <sys/socket.h>		/* socket connect setsockopt */
+#include <sys/time.h>		/* timeval */
+#include <netdb.h>		/* gethostbyname */
+#include <netinet/in.h>		/* sockaddr_in */
+#include <netinet/tcp.h>	/* TCP_NODELAY */
+#include <arpa/inet.h>		/* inet_addr */
+#endif
+
 #define IPv6
 
 #include "rdesktop.h"
@@ -32,20 +56,12 @@
 #include <openssl/x509.h>
 #include <openssl/err.h>
 
-#ifndef _WIN32
-#include <unistd.h>		/* select read write close */
-#include <sys/socket.h>		/* socket connect setsockopt */
-#include <sys/time.h>		/* timeval */
-#include <netdb.h>		/* gethostbyname */
-#include <netinet/in.h>		/* sockaddr_in */
-#include <netinet/tcp.h>	/* TCP_NODELAY */
-#include <arpa/inet.h>		/* inet_addr */
-#endif
 
+char g_targetaddr[64];
+char g_targetport[8];
 
 
 #ifdef _WIN32
-#define socklen_t int
 #define TCP_CLOSE(_sck) closesocket(_sck)
 #define TCP_STRERROR "tcp error"
 #define TCP_BLOCKS (WSAGetLastError() == WSAEWOULDBLOCK)
@@ -130,7 +146,7 @@ tcp_send(STREAM s)
 {
 	int ssl_err;
 	int length = (int)(s->end - s->data);
-    ssize_t sent;
+    long sent;
     int total = 0;
 
 	if (g_network_error == True)
@@ -199,7 +215,7 @@ STREAM
 tcp_recv(STREAM s, uint32 length)
 {
 	uint32 new_length, end_offset, p_offset;
-    ssize_t rcvd = 0;
+    long rcvd = 0;
     int ssl_err;
 
 	if (g_network_error == True)
@@ -439,6 +455,10 @@ tcp_connect(char *server)
 	struct addrinfo hints, *res, *ressave;
 	char tcp_port_rdp_s[10];
 
+#ifdef WIN32
+    {WSADATA x; WSAStartup(0x201,&x);}
+#endif
+
 	snprintf(tcp_port_rdp_s, 10, "%d", g_tcp_port_rdp);
 
 	memset(&hints, 0, sizeof(struct addrinfo));
@@ -455,22 +475,20 @@ tcp_connect(char *server)
 	g_sock = -1;
 	while (res)
 	{
-		g_sock = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
+		g_sock = (int)socket(res->ai_family, res->ai_socktype, res->ai_protocol);
 		if (!(g_sock < 0))
         {
-            char targetaddr[64];
-            char targetport[8];
             int err;
             
             /* Print the address/port to strings for logging/debugging  */
-            err = getnameinfo(res->ai_addr, res->ai_addrlen,
-                              targetaddr, sizeof(targetaddr),
-                              targetport, sizeof(targetport),
+            err = getnameinfo(res->ai_addr, (int)res->ai_addrlen,
+                              g_targetaddr, (int)sizeof(g_targetaddr),
+                              g_targetport, (int)sizeof(g_targetport),
                               NI_NUMERICHOST | NI_NUMERICSERV);
-            fprintf(stderr, "[+] connecting to [%s]:%s\n", targetaddr, targetport);
+            fprintf(stderr, "[+] [%s]:%s connecting...\n", g_targetaddr, g_targetport);
             
             
-			if (connect(g_sock, res->ai_addr, res->ai_addrlen) == 0)
+			if (connect(g_sock, res->ai_addr, (int)res->ai_addrlen) == 0)
 				break;
             else {
                 error("connect failed: %s\n", strerror(errno));

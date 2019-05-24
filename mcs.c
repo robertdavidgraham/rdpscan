@@ -260,7 +260,7 @@ mcs_send_to_channel(STREAM s, uint16 channel)
 	uint16 length;
 
 	s_pop_layer(s, mcs_hdr);
-	length = s->end - s->p - 8;
+	length = (uint16)(s->end - s->p - 8);
 	length |= 0x8000;
 
 	out_uint8(s, (MCS_SDRQ << 2));
@@ -303,7 +303,8 @@ mcs_recv(uint16 * channel, uint8 * rdpver)
 
 		if (appid ==  MCS_DPUM)
 		{
-			printf("[!] Target is VULNERABLE!!!\n");
+            extern char g_targetaddr[];
+			printf("%s: VULNERABLE\n", g_targetaddr);
 			exit(0);
 		}
 		
@@ -348,7 +349,7 @@ mcs_connect_finalize(STREAM mcs_data)
 	mcs_send_cjrq(MCS_GLOBAL_CHANNEL);
 	if (!mcs_recv_cjcf())
 		goto error;
-
+    fprintf(stderr, "[+] sending %u channels\n", (unsigned)g_num_channels);
 	for (i = 0; i < g_num_channels; i++)
 	{
 		mcs_send_cjrq(g_channels[i].mcs_id);

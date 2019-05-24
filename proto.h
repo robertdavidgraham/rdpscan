@@ -42,8 +42,8 @@ int ctrl_init(const char *user, const char *domain, const char *host);
 void ctrl_cleanup(void);
 RD_BOOL ctrl_is_slave(void);
 int ctrl_send_command(const char *cmd, const char *args);
-void ctrl_add_fds(int *n, fd_set * rfds);
-void ctrl_check_fds(fd_set * rfds, fd_set * wfds);
+//void ctrl_add_fds(int *n, fd_set * rfds);
+//void ctrl_check_fds(fd_set * rfds, fd_set * wfds);
 
 /* disk.c */
 int disk_enum_devices(uint32 * id, char *optarg);
@@ -143,17 +143,17 @@ void convert_to_unix_filename(char *filename);
 void rdpdr_send_completion(uint32 device, uint32 id, uint32 status, uint32 result, uint8 * buffer,
 			   uint32 length);
 RD_BOOL rdpdr_init(void);
-void rdpdr_add_fds(int *n, fd_set * rfds, fd_set * wfds, struct timeval *tv, RD_BOOL * timeout);
+//void rdpdr_add_fds(int *n, fd_set * rfds, fd_set * wfds, struct timeval *tv, RD_BOOL * timeout);
 struct async_iorequest *rdpdr_remove_iorequest(struct async_iorequest *prev,
 					       struct async_iorequest *iorq);
-void rdpdr_check_fds(fd_set * rfds, fd_set * wfds, RD_BOOL timed_out);
+//void rdpdr_check_fds(fd_set * rfds, fd_set * wfds, RD_BOOL timed_out);
 RD_BOOL rdpdr_abort_io(uint32 fd, uint32 major, RD_NTSTATUS status);
 /* rdpsnd.c */
 void rdpsnd_record(const void *data, unsigned int size);
 RD_BOOL rdpsnd_init(char *optarg);
 void rdpsnd_show_help(void);
-void rdpsnd_add_fds(int *n, fd_set * rfds, fd_set * wfds, struct timeval *tv);
-void rdpsnd_check_fds(fd_set * rfds, fd_set * wfds);
+//void rdpsnd_add_fds(int *n, fd_set * rfds, fd_set * wfds, struct timeval *tv);
+//void rdpsnd_check_fds(fd_set * rfds, fd_set * wfds);
 struct audio_packet *rdpsnd_queue_current_packet(void);
 RD_BOOL rdpsnd_queue_empty(void);
 void rdpsnd_queue_next(unsigned long completed_in_us);
