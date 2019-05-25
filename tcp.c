@@ -32,6 +32,8 @@
 #include <intrin.h>
 #include <process.h>
 #define snprintf _snprintf
+#define close(fd) closesocket(fd)
+typedef int ssize_t;
 #else
 #include <unistd.h>		/* select read write close */
 #include <sys/socket.h>		/* socket connect setsockopt */
@@ -305,14 +307,17 @@ tcp_recv(STREAM s, uint32 length)
                 int err;
                 int unsent_count = 0;
                 socklen_t sizeof_count = sizeof(unsent_count);
-                
+
+
                 /* See if there is unsent data */
+#ifdef SO_NWRITE                
                 err = getsockopt(g_sock, SOL_SOCKET, SO_NWRITE, &unsent_count, &sizeof_count);
                 if (err) {
                     STATUS(1, "[-] getsockopt(SO_NWRITE) error %s\n", strerror(errno));
                 } else {
                     STATUS(1, "[-] SO_NWRITE = %d\n", unsent_count);
                 }
+#endif
                 
                 /* Look for full TCP window on the other side */
                 if (total_data_received == 0 && unsent_count > 0) {
@@ -602,7 +607,14 @@ sockets_connect(const char *target, unsigned port)
          * timeouts take. This wasn't done in the original rdesktop code, but
          * yet the code seemed to have been written to anticipate non-blocking
          * sockets anyway, so it all works pretty cleanly */
+#ifdef WIN32
+        {
+            ULONG yes = 1;
+            ioctlsocket(fd, FIONBIO, &yes);
+        }
+#else
         fcntl(fd, F_SETFL, fcntl(fd, F_GETFL) | O_NONBLOCK);
+#endif
 
         /* Attempt the connection */
         STATUS(1, "[+] connecting...\n");
@@ -629,7 +641,7 @@ sockets_connect(const char *target, unsigned port)
             if (fd != -1) {
                 int errcode;
                 socklen_t sizeof_errcode = sizeof(errcode);
-                err = getsockopt(fd, SOL_SOCKET, SO_ERROR, &errcode, &sizeof_errcode);
+                err = getsockopt(fd, SOL_SOCKET, SO_ERROR, (char*)&errcode, &sizeof_errcode);
                 if (err != 0) {
                     STATUS(1, "[-] getsockopt() error: %s\n", strerror(errno));
                     close(fd);
@@ -746,7 +758,7 @@ socks_send(int fd, const unsigned char *buf, size_t length)
         if (!tcp_can_send(fd, 100))
             continue;
         
-        bytes_sent = send(fd, buf + offset, length - offset, 0);
+        bytes_sent = send(fd, buf + offset, (int)(length - offset), 0);
         if (bytes_sent < 0) {
             STATUS(1, "[-] SOCKS: send(): %s\n", strerror(errno));
             close(fd);
@@ -778,7 +790,7 @@ socks_receive(int fd, const unsigned char *buf, size_t length)
         if (!tcp_can_receive(fd, 100))
             continue;
         
-        bytes_received = recv(fd, (char*)buf + offset, length - offset, 0);
+        bytes_received = recv(fd, (char*)buf + offset, (int)(length - offset), 0);
         if (bytes_received < 0) {
             STATUS(1, "[-] SOCKS: recv(): %s\n", strerror(errno));
             close(fd);
