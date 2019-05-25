@@ -547,6 +547,15 @@ spawn_workers(const char *progname,
         if (ispunct(*line) && *line != '[')
             continue;
         
+        /* If this is a line from masscan, then trim that beginning up
+         * to the IP address */
+        if (memcmp(line, "Discovered open port ", 21) == 0) {
+            char *line2 = strstr(line, " on ");
+            if (line2 == NULL)
+                continue;
+            memmove(line, line2+4, strlen(line2)+4);
+        }
+        
         /* Now spawn the child */
         child = &children[children_count++];
         *child = spawn_worker(progname, line, debug_level, rdp_port);

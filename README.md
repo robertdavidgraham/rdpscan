@@ -78,7 +78,7 @@ Just run the program with an IP address:
 
     ./rdpscan 192.168.10.101
     
-You can scan multiple targets at once. Instead of IPv4 addresses, they an be
+You can scan multiple targets at once. Instead of IPv4 addresses, they can be
 DNS names or IPv6 addresses.
 
     ./rdpscan 192.168.10.101 exchange.example.com 2001:0db8:85a3::1
@@ -116,6 +116,15 @@ Whether "CredSSP required" (meaning NLA required) is "SAFE" is debatable.
 It means it requires a password
 login *before* we can test/trigger the vuln. It may be unpatched and vulnerable to
 an authenticated user, it's just not exploitable by a worm or unauthenticated user.
+
+You *should* always get one-and-only-one status on `stdout` for each IP address
+you scan. Of course, if you specify an IP address multiple times, you'll get multiple
+statuses for that address.
+
+However, because this code is based on `rdestkop`, there are certain protocol
+errors that won't lead to a status. If you've got a public IP address on the Internet
+that produces one of these errors, then I'm eager to fix it.
+
 
 ## Diagnostic info
 
