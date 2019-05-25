@@ -34,6 +34,43 @@ just:
 The code is written in C, so needs a C compiler installed, such as doing the following:
 
     $ sudo apt install build-essential
+    
+## Common build errors
+
+This section describes the more obvious build errors.
+
+    ssl.h:24:25: fatal error: openssl/rc4.h: No such file or directory
+
+This means you either don't have the OpensSSL headers installed, or they aren't
+in a path somewhere. Remember that even if you have OpenSSL binaries installed,
+this doesn't mean you've got the development stuff installed. You need both
+the headers and libraries installed.
+
+To install these things on Debian, do:
+
+    $ sudo apt install libssl-dev
+    
+To fix the path issue, add a compilation flag `-I/usr/local/include`, or something 
+similar.
+
+An example linker problem is the following:
+
+    Undefined symbols for architecture x86_64:
+    "_OPENSSL_init_ssl", referenced from:
+        _tcp_tls_connect in tcp-fac73c.o
+    "_RSA_get0_key", referenced from:
+        _rdssl_rkey_get_exp_mod in ssl-d5fdf5.o
+    "_SSL_CTX_set_options", referenced from:
+        _tcp_tls_connect in tcp-fac73c.o
+    "_X509_get_X509_PUBKEY", referenced from:
+        _rdssl_cert_to_rkey in ssl-d5fdf5.o
+
+I get this on macOS because there's multiple versions of OpenSSL. I fix this
+by hard-coding the paths:
+
+    $ gcc *.c -lssl -lcrypto -I/usr/local/include -L/usr/local/lib -o rdpscan
+
+
 
 ## Running
 
