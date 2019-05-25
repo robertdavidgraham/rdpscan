@@ -13,6 +13,16 @@ having stayed up late futzing with development.
 
  - 2019-05-24 - works on Linux and macOS, Windows has a few compilation bugs
  - 2019-05-23 - currently working on macOS within XCode
+ 
+ ## Primary use
+ 
+ The primary way of using this tool is first using `masscan` to scan for the port,
+ then using tool to probe those ports that are listening. An example is:
+ 
+    $ masscan 0.0.0.0/0 -p3389 >ips.txt
+    $ rdpscan --file ips.txt > results.txt
+    
+In the `results.txt` file, search for those lines containing the string "VULNERABLE".
 
 ## Building
 
