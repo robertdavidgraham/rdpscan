@@ -6,9 +6,15 @@
 #include "util-time.h"
 #include "util-xmalloc.h"
 #include "workers.h"
+#include "ranges.h"         /* from masscan */
+#include "rand-blackrock.h" /* from masscan */
 #include <ctype.h>
 #include <string.h>
 #include <stdlib.h>
+
+/* My custom globals */
+char *g_username;
+
 
 uint8 g_static_rdesktop_salt_16[16] = {
     0xb8, 0x82, 0x29, 0x31, 0xc5, 0x39, 0xd9, 0x44,
@@ -123,26 +129,58 @@ save_licence(unsigned char *data, int length)
 }
 
 
+/**
+ * Whether an address is a range of addresses. There are
+ * two formats for ranges, two addresses separated by a
+ * dash, or a CIDR spec. This is only a rough approx
+ * and does not validate the address. It's primarily checking
+ * that it's NOT a valid IPv4 address, IPv6 address, or
+ * DNS name.
+ */
+static int
+is_ipv4_range(const char *addr)
+{
+    size_t i;
+    size_t count_dash = 0;
+    size_t count_slash = 0;
+    
+    for (i=0; addr[i]; i++) {
+        if (addr[i] == '-')
+            count_dash++;
+        else if (addr[i] == '/')
+            count_slash++;
+        else if (!isdigit(addr[i]) && addr[i] != '.')
+            return 0;
+    }
+    
+    if (count_dash == 0 && count_slash == 1)
+        return 1;
+    if (count_dash == 1 && count_slash == 0)
+        return 1;
+    
+    return 0;
+}
 
-/* My custom globals */
-char *g_username = "rdpscan";
 
 /**
  * Generate a random username on startup, because systems reject
  * repeated use of the same username
  */
-void randomize_username(void)
+static char *
+randomize_username(void)
 {
     unsigned long long x = util_nanotime();
     size_t i;
+    char *result;
 
-    g_username = xmalloc(10);
+     result = xmalloc(10);
 
     for (i=0; i<8 && x; i++, x /= 32) {
         static const char chars[] = "abcdfghijklmnopqrsuvwxyz0123456789";
-        g_username[i] = chars[x % 32];
+        result[i] = chars[x % 32];
     }
-    g_username[i] = '\0';
+    result[i] = '\0';
+    return result;
 }
 
 struct command_line
@@ -351,6 +389,57 @@ int main(int argc, char *argv[])
         print_help();
     parse_commandline(&cfg, argc, argv);
     
+    /* See if we have a single IPv4 range, in which case we expand
+     * this into a larger range */
+    if (cfg.list_filename == NULL && cfg.target_count == 1 && is_ipv4_range(cfg.targets[0])) {
+        char *string = cfg.targets[0];
+        unsigned index = 0;
+        struct Range range;
+        struct RangeList list = {0};
+        size_t i;
+        size_t count;
+        struct BlackRock br;
+        
+        /* Free the old list and reset it to NULL */
+        free(cfg.targets);
+        cfg.targets = 0;
+        cfg.target_count = 0;
+        
+        /* Parse the range */
+        range = range_parse_ipv4(string, &index, (unsigned)strlen(string));
+        if (!range_is_valid(range)) {
+            fprintf(stderr, "[-] %s: invalid range\n", string);
+            exit(1);
+        }
+        
+        /* Create an internal array of addresses */
+        rangelist_add_range(&list, range.begin, range.end);
+        rangelist_sort(&list);
+        rangelist_optimize(&list);
+        
+        /* Now grab all the individual IP addresses in our range and
+         * add them to the list. */
+        count = rangelist_count(&list);
+        blackrock_init(&br, count, time(0), 3);
+
+        for (i=0; i<count; i++) {
+            char ipstr[16];
+            unsigned ip = rangelist_pick(&list, blackrock_shuffle(&br, i));
+
+            snprintf(ipstr, sizeof(ipstr), "%u.%u.%u.%u",
+                     (ip>>24) & 0xFF,
+                     (ip>>16) & 0xFF,
+                     (ip>> 8) & 0xFF,
+                     (ip>> 0) & 0xFF
+                     );
+            cfg.targets = xrealloc(cfg.targets, (cfg.target_count+2) * sizeof(char*));
+            cfg.targets[cfg.target_count++] = xstrdup(ipstr);
+            cfg.targets[cfg.target_count] = NULL; /* null termiante this list */
+        }
+        
+        rangelist_remove_all(&list);
+    }
+    
     /* If a file of many IP addresses was specified, then instead of
      * scannign them in ths process, spawn worker processes to scan them.
      * that's because this program was designed with lots of global variables,
@@ -365,7 +454,8 @@ int main(int argc, char *argv[])
     
     /* RDP servers will cache the cookie and reject connections with the same
      * cookie. Therefore, every connection should have it's own cookie */
-    randomize_username();
+    if (g_username == NULL)
+        g_username = randomize_username();
     
     /* This is the start of the CVE-2019-0708 check, it creates a T120 channel
      * that it will then attempt to receive data on */
