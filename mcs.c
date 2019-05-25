@@ -349,7 +349,9 @@ mcs_connect_finalize(STREAM mcs_data)
 	mcs_send_cjrq(MCS_GLOBAL_CHANNEL);
 	if (!mcs_recv_cjcf())
 		goto error;
-    fprintf(stderr, "[+] sending %u channels\n", (unsigned)g_num_channels);
+    
+    STATUS(3, "[+] sending %u channels\n", (unsigned)g_num_channels);
+    
 	for (i = 0; i < g_num_channels; i++)
 	{
 		mcs_send_cjrq(g_channels[i].mcs_id);

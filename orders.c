@@ -447,8 +447,8 @@ process_memblt(STREAM s, MEMBLT_ORDER * os, uint32 present, RD_BOOL delta)
 	if (present & 0x0100)
 		in_uint16_le(s, os->cache_idx);
 
-		// anywhere after the connection sequence should do
-		mst120_check();
+    // anywhere after the connection sequence should do
+    mst120_check();
 
 
 	DEBUG(("MEMBLT(op=0x%x,x=%d,y=%d,cx=%d,cy=%d,id=%d,idx=%d)\n",
@@ -1382,8 +1382,11 @@ process_orders(STREAM s, uint16 num_orders)
 
 			delta = order_flags & RDP_ORDER_DELTA;
 
-            fprintf(stderr, "[+] order = %u\n", os->order_type);
-			switch (os->order_type)
+            {
+                static unsigned count = 0;
+                STATUS(3, "[+] %5u order = %u\n", count++, os->order_type);
+            }
+            switch (os->order_type)
 			{
 				case RDP_ORDER_DESTBLT:
 					process_destblt(s, &os->destblt, present, delta);

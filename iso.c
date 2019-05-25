@@ -98,6 +98,8 @@ iso_send_connection_request(char *username, uint32 neg_proto)
 
 	s_mark_end(s);
 	tcp_send(s);
+    
+
 }
 
 /* Receive a message on the ISO layer, return code */
@@ -282,7 +284,11 @@ iso_connect(char *server, char *username, char *domain, char *password,
 					reason = "SSL required by server";
 					break;
 				case HYBRID_REQUIRED_BY_SERVER:
+                    /* [CVE-2019-0708] I'm told when this is the case, then the
+                     * target is not vulnerable */
 					reason = "CredSSP required by server";
+                    STATUS(0, "[-] connect fail: %s\n", reason);
+                    RESULT("SAFE - CredSSP required\n");
 					break;
 				default:
 					reason = "unknown reason";
@@ -298,7 +304,7 @@ iso_connect(char *server, char *username, char *domain, char *password,
 				goto retry;
 			}
 
-			fprintf(stderr, "Failed to connect, %s.\n", reason);
+            STATUS(0, "[-] connect fail: %s\n", reason);
 			return False;
 		}
 
@@ -321,7 +327,7 @@ iso_connect(char *server, char *username, char *domain, char *password,
 			}
 			/* do not use encryption when using TLS */
 			g_encryption = False;
-		    fprintf(stderr, "[+] [%s]:%s connection established using SSL\n", g_targetaddr, g_targetport);
+		    STATUS(1, "[+] SSL connection\n", g_targetaddr, g_targetport);
 		}
 #ifdef WITH_CREDSSP
 		else if (data == PROTOCOL_HYBRID)

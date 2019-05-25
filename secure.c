@@ -745,7 +745,7 @@ sec_process_srv_info(STREAM s)
     uint16 minor;
 	in_uint16_le(s, g_server_rdp_version);
 	in_uint16_le(s, minor);
-    fprintf(stderr, "[+] [%s]:%s v%u.%u\n", g_targetaddr, g_targetport, g_server_rdp_version, minor);
+    STATUS(1, "[+] version = v%u.%u\n", g_server_rdp_version, minor);
 	DEBUG_RDP5(("Server RDP version is %d\n", g_server_rdp_version));
 	if (1 == g_server_rdp_version)
 	{

@@ -5,6 +5,9 @@
 #include "tcp.h"
 #include "util-time.h"
 #include "util-xmalloc.h"
+#include "workers.h"
+#include <string.h>
+#include <stdlib.h>
 
 uint8 g_static_rdesktop_salt_16[16] = {
     0xb8, 0x82, 0x29, 0x31, 0xc5, 0x39, 0xd9, 0x44,
@@ -141,6 +144,111 @@ void randomize_username(void)
     g_username[i] = '\0';
 }
 
+struct command_line
+{
+    char *target;
+    int debug_level;
+    const char *list_filename;
+    
+};
+
+
+char *g_socks5_server = 0;
+unsigned g_socks5_port = 9150;
+
+void
+parse_commandline(struct command_line *cfg, int argc, char *argv[])
+{
+    int i;
+    
+    for (i=1; i<argc; i++) {
+        const char *arg = argv[i];
+        
+        if (arg[0] == '-') {
+            switch (arg[1]) {
+                case 'd':
+                {
+                    int j;
+                    for (j=0; arg[j]; j++) {
+                        extern int g_log_level;
+                        if (arg[j] == 'd') {
+                            cfg->debug_level++;
+                            g_log_level++;
+                        }
+                    }
+                }
+                    break;
+                case '-':
+                    if (strncmp(arg, "--list", 6) == 0) {
+                        arg += 6;
+                        if (*arg == 0) {
+                            if (i+1 >= argc) {
+                                fprintf(stderr, "[-] expected filename after --list\n");
+                                exit(1);
+                            } else {
+                                arg = argv[++i];
+                            }
+                        } else if (*arg == ':' || *arg == '=') {
+                            arg++;
+                        }
+                        if (arg[0] == '-' && arg[1] != '\0') {
+                            fprintf(stderr, "[-] expected filename after --list\n");
+                            exit(1);
+                        }
+                        cfg->list_filename = xstrdup(arg);
+                    } else if (strncmp(arg, "--socks5port", 12) == 0) {
+                        arg += 12;
+                        if (*arg == 0) {
+                            if (i+1 >= argc) {
+                                fprintf(stderr, "[-] expected socks5 port\n");
+                                exit(1);
+                            } else {
+                                arg = argv[++i];
+                            }
+                        } else if (*arg == ':' || *arg == '=') {
+                            arg++;
+                        }
+                        if (arg[0] == '-' && arg[1] != '\0') {
+                            fprintf(stderr, "[-] expected socks5 port\n");
+                            exit(1);
+                        }
+                        g_socks5_port = atoi(arg);
+                        
+                    } else if (strncmp(arg, "--socks5", 8) == 0) {
+                        arg += 8;
+                        if (*arg == 0) {
+                            if (i+1 >= argc) {
+                                fprintf(stderr, "[-] expected socks5 server\n");
+                                exit(1);
+                            } else {
+                                arg = argv[++i];
+                            }
+                        } else if (*arg == ':' || *arg == '=') {
+                            arg++;
+                        }
+                        if (arg[0] == '-' && arg[1] != '\0') {
+                            fprintf(stderr, "[-] expected socks5 server\n");
+                            exit(1);
+                        }
+                        g_socks5_server = xstrdup(arg);
+                        
+                    } else {
+                        fprintf(stderr, "[-] unknown param: %s\n", arg);
+                    }
+            }
+        } else {
+            if (cfg->target) {
+                fprintf(stderr, "[-] only one target parameter allowed, or use --list <filename> for multiple targets\n");
+                exit(1);
+            } else {
+                cfg->target = xstrdup(argv[i]);
+            }
+        }
+    }
+    
+
+}
+
 int main(int argc, char *argv[])
 {
     unsigned flags = 0;
@@ -148,58 +256,66 @@ int main(int argc, char *argv[])
     char shell[32] = "";
     char directory[32] = "";
     RD_BOOL g_reconnect_loop = False;
-    int i;
-
-    flags = RDP_INFO_MOUSE | RDP_INFO_DISABLECTRLALTDEL
-     | RDP_INFO_UNICODE | RDP_INFO_MAXIMIZESHELL | RDP_INFO_ENABLEWINDOWSKEY;
+    struct command_line cfg = {0};
+    int err;
     
     if (argc <= 1) {
         fprintf(stderr, "Usage:\n rdpscan <target>\n");
         return 1;
     }
 
+    parse_commandline(&cfg, argc, argv);
+    
+    /* If a file of many IP addresses was specified, then instead of
+     * scannign them in ths process, spawn worker processes to scan them.
+     * that's because this program was designed with lots of global variables,
+     * so we can't scan them all in this process */
+    if (cfg.list_filename)
+        return spawn_workers(argv[0], cfg.list_filename, cfg.debug_level, 10);
+    
+    /* RDP servers will cache the cookie and reject connections with the same
+     * cookie. Therefore, every connection should have it's own cookie */
     randomize_username();
     
+    /* This is the start of the CVE-2019-0708 check, it creates a T120 channel
+     * that it will then attempt to receive data on */
     if (!mst120_check_init())
     {
         printf("[-] Failed to initialize MS_T120 channel!\n");
     }
 
-    for (i=1; i<argc; i++) {
-        int err;
-        char *server = argv[i];
-        
-        err = rdp_connect(server,
-                          flags,
-                          domain,
-                          g_password,
-                          shell,
-                          directory,
-                          g_reconnect_loop);
-        
-        /* By setting encryption to False here, we have an encrypted login
-         packet but unencrypted transfer of other packets */
-        if (!g_packet_encryption)
-            g_encryption_initial = g_encryption = False;
-        
-        DEBUG(("Connection successful.\n"));
-        
-        //rd_create_ui();
-        tcp_run_ui(True);
-        
-        {
-            RD_BOOL deactivated = False;
-            unsigned ext_disc_reason = 0;
-            g_reconnect_loop = False;
-            rdp_main_loop(&deactivated, &ext_disc_reason);
-        }
-        
-        tcp_run_ui(False);
-        
-        DEBUG(("Disconnecting...\n"));
-        rdp_disconnect();
-
+    /* Do the RDP connection. This is where all the interesting stuff happens */
+    flags = RDP_INFO_MOUSE | RDP_INFO_DISABLECTRLALTDEL
+    | RDP_INFO_UNICODE | RDP_INFO_MAXIMIZESHELL | RDP_INFO_ENABLEWINDOWSKEY;
+    err = rdp_connect(cfg.target,
+                      flags,
+                      domain,
+                      g_password,
+                      shell,
+                      directory,
+                      g_reconnect_loop);
+    
+    /* By setting encryption to False here, we have an encrypted login
+     packet but unencrypted transfer of other packets */
+    if (!g_packet_encryption)
+        g_encryption_initial = g_encryption = False;
+    
+    DEBUG(("Connection successful.\n"));
+    
+    //rd_create_ui();
+    tcp_run_ui(True);
+    
+    {
+        RD_BOOL deactivated = False;
+        unsigned ext_disc_reason = 0;
+        g_reconnect_loop = False;
+        rdp_main_loop(&deactivated, &ext_disc_reason);
     }
+    
+    tcp_run_ui(False);
+    
+    DEBUG(("Disconnecting...\n"));
+    rdp_disconnect();
     
     return 0;
 }

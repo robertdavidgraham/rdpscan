@@ -107,7 +107,7 @@
 #define EXRD_WINDOW_CLOSED 62
 #define EXRD_UNKNOWN 63
 
-#define WITH_DEBUG 1
+#undef DEBUG
 #ifdef WITH_DEBUG
 #define DEBUG(args)	printf args;
 #else
