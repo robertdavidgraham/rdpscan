@@ -16,15 +16,24 @@ having stayed up late futzing with development.
 
 ## Building
 
-You should just be able to compile all the *.c* files together. That's
-all the current Makefile does.
+The difficult part is getting the OpenSSL libraries installed, and not conflicting
+with other versions of OpenSSL on the system. On Debian Linux, I do:
+
+    $ sudo apt install libssl-dev
+
+Once you've solved that problem, you just compile all the `.c` files together
+like this:
 
     $ gcc *.c -lssl -lcrypto -o rdpscan
+
+I've put a Makefile in the directory that does this, so you can likely do
+just:
+
+    $ make
     
-However, this may fail because of OpenSSL issues. This works well
-on Linux (`apt install libssl-dev`), but fails mightily on macOS.
-I've got it working in my XCode10 project, but I can't get it also working
-on macOS command-line because of conflicting headers/libraries.
+The code is written in C, so needs a C compiler installed, such as doing the following:
+
+    $ sudo apt install build-essential
 
 ## Running
 
@@ -36,6 +45,11 @@ You can scan multiple targets at once. Instead of IPv4 addresses, they an be
 DNS names or IPv6 addresses.
 
     ./rdpscan 192.168.10.101 exchange.example.com 2001:0db8:85a3::1
+    
+You can also scan ranges of addresses, using either begin-end IPv4 addresses,
+or IPv4 CIDR spec. IPv6 ranges aren't supported because they are so big.
+
+    ./rdpscan 10.0.0.1-10.0.0.25 192.168.0.0/16
 
 You can scan zillions of targets at once by loading address from a `--file` instead.
 The format is each address should be alone on a line. Whitespace is ignored.

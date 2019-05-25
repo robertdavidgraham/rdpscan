@@ -103,10 +103,23 @@ const unsigned char sbox[256] = {
 
 /***************************************************************************
  ***************************************************************************/
+static double my_sqrt(double n){
+    double lo = 0, hi = n, mid = n;
+    for(int i = 0 ; i < 1000 ; i++){
+        mid = (lo+hi)/2;
+        if(mid*mid == n) return mid;
+        if(mid*mid > n) hi = mid;
+        else lo = mid;
+    }
+    return mid;
+}
+
+/***************************************************************************
+ ***************************************************************************/
 void
 blackrock_init(struct BlackRock *br, uint64_t range, uint64_t seed, unsigned rounds)
 {
-    double foo = sqrt(range * 1.0);
+    double foo = my_sqrt(range * 1.0);
 
     /* This algorithm gets very non-random at small numbers, so I'm going
      * to try to fix some constants here to make it work. It doesn't have
