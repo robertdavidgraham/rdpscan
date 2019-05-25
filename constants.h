@@ -19,8 +19,6 @@
 #ifndef RDESK_CONSTANTS_H
 #define RDESK_CONSTANTS_H
 
-/* TCP port for Remote Desktop Protocol */
-#define TCP_PORT_RDP 3389
 
 #define DEFAULT_CODEPAGE	"UTF-8"
 #define WINDOWS_CODEPAGE	"UTF-16LE"

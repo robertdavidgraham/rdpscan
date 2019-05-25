@@ -241,7 +241,13 @@ iso_connect(char *server, char *username, char *domain, char *password,
 
 	if (code != ISO_PDU_CC)
 	{
-		error("expected CC, got 0x%x\n", code);
+		STATUS(1, "expected CC, got 0x%x\n", code);
+        if (s->end - s->data > 7 && memcmp(s->data, "HTTP/1.", 7) == 0) {
+            RESULT("SAFE - not RDP but HTTP\n");
+        } else if (s->end - s->data > 7 && memcmp(s->data, "SSH-2.0", 7) == 0) {
+                RESULT("SAFE - not RDP but SSH\n");
+        } else
+            RESULT("SAFE - protocol error\n");
 		tcp_disconnect();
 		return False;
 	}
@@ -287,7 +293,7 @@ iso_connect(char *server, char *username, char *domain, char *password,
                     /* [CVE-2019-0708] I'm told when this is the case, then the
                      * target is not vulnerable */
 					reason = "CredSSP required by server";
-                    STATUS(0, "[-] connect fail: %s\n", reason);
+                    STATUS(1, "[-] connect fail: %s\n", reason);
                     RESULT("SAFE - CredSSP required\n");
 					break;
 				default:

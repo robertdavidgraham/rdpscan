@@ -93,7 +93,7 @@ static int g_sock;
 static RD_BOOL g_run_ui = False;
 static struct stream g_in;
 static struct stream g_out[STREAM_COUNT];
-int g_tcp_port_rdp = TCP_PORT_RDP;
+int g_tcp_port_rdp = 3389;
 extern RD_BOOL g_user_quit;
 extern RD_BOOL g_network_error;
 extern RD_BOOL g_reconnect_loop;
@@ -904,7 +904,11 @@ socks5_connect(const char *socks_host, unsigned socks_port,
     if (fd == -1)
         return -1;
     
-    
+    /* Change the debug strings for TCP to instead be the eventual target
+     * and not the Socks server */
+    snprintf(g_targetaddr, 256, "%s", target_host);
+    snprintf(g_targetport, 8, "%u", target_port);
+
     /* Now receive the connection response
      +----+-----+-------+------+----------+----------+
      |VER | REP |  RSV  | ATYP | BND.ADDR | BND.PORT |
@@ -913,8 +917,10 @@ socks5_connect(const char *socks_host, unsigned socks_port,
      +----+-----+-------+------+----------+----------+
      */
     fd = socks_receive(fd, buf, 4);
-    if (fd == -1)
+    if (fd == -1) {
+        RESULT("UNKNOWN - connect timeout\n");
         return -1;
+    }
     switch (buf[3]) {
         case Ver4:
             fd = socks_receive(fd, buf+4, 4 + 2);
@@ -947,7 +953,9 @@ socks5_connect(const char *socks_host, unsigned socks_port,
         close(fd);
         fd = -1;
     }
+    
     STATUS(1, "[+] SOCKS5: connecting through [%s]:%s\n", bindaddr, bindport);
+    
     
     /* At this point, everything seems to be okay, and we can return this
      * socket as a normally connected socket for continued use

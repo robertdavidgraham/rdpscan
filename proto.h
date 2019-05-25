@@ -99,7 +99,7 @@ int pstcache_enumerate(uint8 id, HASH_KEY * keylist);
 RD_BOOL pstcache_init(uint8 cache_id);
 /* rdesktop.c */
 
-char *next_arg(char *src, char needle);
+//char *next_arg(char *src, char needle);
 void toupper_str(char *p);
 RD_BOOL str_startswith(const char *s, const char *prefix);
 RD_BOOL str_handle_lines(const char *input, char **rest, str_handle_lines_t linehandler,

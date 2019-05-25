@@ -10,6 +10,7 @@
 #include <string.h>
 #include <errno.h>
 #include <signal.h>
+#include <stdarg.h>
 
 #ifdef WIN32
 #define WIN32_LEAN_AND_MEAN 
@@ -39,7 +40,7 @@ char *my_strerror(DWORD err)
     return msg;
 }
 static struct spawned
-spawn_program(const char *progname, const char *argument)
+spawn_program(const char *progname, size_t arg_count, ...)
 {
     SECURITY_ATTRIBUTES saAttr = {0};
     DWORD err;
@@ -115,8 +116,12 @@ spawn_program(const char *progname, const char *argument)
 
        return child;
    }
-   //CloseHandle(proc_info.hProcess);
-   //CloseHandle(proc_info.hThread);
+    
+    /* This should automatically reap zombies, by indicating
+     * we are not interested in any return results from the
+     * process, only their pipes */
+    CloseHandle(proc_info.hProcess);
+    CloseHandle(proc_info.hThread);
 
 }
 
@@ -232,6 +237,7 @@ cleanup_children(struct spawned *children, size_t *children_count)
  */
 struct spawned
 {
+    const char *name;
     int pid;
     int fdout[2];
     int fderr[2];
@@ -242,10 +248,11 @@ struct spawned
  * Do a fork()/exec() to spawn the program
  */
 static struct spawned
-spawn_program(const char *progname, const char *argument)
+spawn_program(const char *progname, size_t arg_count, ...)
 {
     struct spawned child = {0};
     int err;
+    char **new_argv;
     
     /* Create a pipe to get output from child */
     err = pipe(child.fdout);
@@ -263,13 +270,25 @@ spawn_program(const char *progname, const char *argument)
     child.is_closed = 0;
     child.pid = fork();
     
-    if (child.pid == 0) {
-        /* We are the CHILD */
-        char * new_argv[3];
-        new_argv[0] = (char *)progname;
-        new_argv[1] = (char *)argument;
-        new_argv[2] = 0;
+    /* Setup child parameters */
+    {
+        size_t i = 0;
         
+        /* We are the CHILD */
+        new_argv = alloca((arg_count + 2) * sizeof(char*));
+        va_list marker;
+        
+        new_argv[i++] = (char *)progname;
+        va_start(marker, arg_count);
+        while (arg_count--) {
+            new_argv[i++] = va_arg(marker, char*);
+        }
+        va_end(marker);
+        new_argv[i] = NULL;
+        child.name = new_argv[1];
+    }
+    
+    if (child.pid == 0) {
         /* Close the 'read' end of the pipe, since child only writes to it */
         close(child.fdout[0]);
         close(child.fderr[0]);
@@ -399,6 +418,7 @@ cleanup_children(struct spawned *children, size_t *children_count)
         if (child->fdout[0] == -1 && child->fderr[0] == -1) {
             memcpy(child, &children[*children_count - 1], sizeof(*child));
             (*children_count)--;
+            i--;
         }
     }
 }
@@ -406,8 +426,48 @@ cleanup_children(struct spawned *children, size_t *children_count)
 #endif
 
 
+/**
+ * A wrapper for spawning a worker, setting up the command-line parameters,
+ * after which the operating-system spawn will happen (either POSIX or WIN32)
+ */
+static struct spawned
+spawn_worker(const char *progname, const char *address, int debug_level, int port_number)
+{
+    char debug[16] = "-dddddddddddddd";
+    char port[32];
+    extern char *g_socks5_server;
+    extern unsigned g_socks5_port;
+    
+    /* We always include the port number as a command-line parameter, even
+     * if it's the default, which is almost always the case */
+    snprintf(port, sizeof(port), "--port=%d", port_number);
+    
+    /* Create the debug-level/diag-level parameter */
+    if (debug_level > 10) {
+        debug_level = 10;
+    }
+    debug[debug_level + 1] = '\0';
+    if (debug_level == 0) {
+        memcpy(debug, "-x", 3); /* stub param to ignore when no diag present */
+    }
+    
+    if (g_socks5_server) {
+        char port2[32];
+        snprintf(port2, sizeof(port2), "--socks5port=%u", g_socks5_port);
+        return spawn_program(progname, 6, address, port, debug, "--socks5", g_socks5_server, port2);
+    } else {
+        return spawn_program(progname, 3, address, port, debug);
+    }
+}
+
+
 int
-spawn_workers(const char *progname, const char *filename, int debug_level, unsigned max_children)
+spawn_workers(const char *progname,
+              const char *filename,
+              char **addresses,
+              int debug_level,
+              int rdp_port,
+              unsigned max_children)
 {
     FILE *fp;
     struct spawned *children;
@@ -445,8 +505,10 @@ spawn_workers(const char *progname, const char *filename, int debug_level, unsig
     
     /* Open the file. If the name is "-", then that means use <stdin>
      * instead of a file */
-    if (strcmp(filename, "-") == 0)
-        fp = stdin;
+    if (filename == NULL)
+        fp = NULL; /* skip file, do only command-line */
+    else if (strcmp(filename, "-") == 0)
+        fp = stdin; /* instead of file, read stdin */
     else {
         fp = fopen(filename, "rt");
         if (fp == NULL) {
@@ -461,7 +523,7 @@ spawn_workers(const char *progname, const char *filename, int debug_level, unsig
     /*
      * Keep spawning workers as we parse the file
      */
-    for (;;) {
+    while (fp) {
         char line[512];
         struct spawned *child;
         
@@ -487,7 +549,7 @@ spawn_workers(const char *progname, const char *filename, int debug_level, unsig
         
         /* Now spawn the child */
         child = &children[children_count++];
-        *child = spawn_program(progname, line);
+        *child = spawn_worker(progname, line, debug_level, rdp_port);
 
         /* Do this at least once, which slows down how fast we spawn
          * new processes. If we've reached the maximum children count,
@@ -500,7 +562,31 @@ spawn_workers(const char *progname, const char *filename, int debug_level, unsig
             }
         } while (children_count == max_children);
     }
-    fprintf(stderr, "[+] done reading file\n");
+    if (fp)
+        fprintf(stderr, "[+] done reading file\n");
+    
+    /* If addresses were specified on the command-line, then add
+     * those to the list as well */
+    while (addresses && *addresses) {
+        struct spawned *child;
+
+        /* Wait until there is space in our list to add the child
+         * process */
+        while (children_count == max_children) {
+            int closed_count = parse_results(children, children_count, 100);
+            if (closed_count)
+                cleanup_children(children, &children_count);
+        }
+        
+        /* Now spawn the child */
+        child = &children[children_count++];
+        *child = spawn_worker(progname, *addresses, debug_level, rdp_port);
+
+        /* Now move to the next address in our list. This is NULL
+         * terminated */
+        addresses++;
+    }
+    
     
     /* We've run out of entries in the file, but we still may have
      * child processes in various states of execution, so we sit

@@ -298,14 +298,13 @@ mcs_recv(uint16 * channel, uint8 * rdpver)
 	{
 		if (appid != MCS_DPUM)
 		{
-			error("expected data, got %d\n", opcode);
+			STATUS(0, "expected data, got %d\n", opcode);
 		}
 
 		if (appid ==  MCS_DPUM)
 		{
             extern char g_targetaddr[];
-			printf("%s: VULNERABLE\n", g_targetaddr);
-			exit(0);
+			RESULT("VULNERABLE -- got appid\n", g_targetaddr);
 		}
 		
 		return NULL;

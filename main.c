@@ -6,6 +6,7 @@
 #include "util-time.h"
 #include "util-xmalloc.h"
 #include "workers.h"
+#include <ctype.h>
 #include <string.h>
 #include <stdlib.h>
 
@@ -146,15 +147,144 @@ void randomize_username(void)
 
 struct command_line
 {
-    char *target;
     int debug_level;
     const char *list_filename;
-    
+    char **targets;
+    size_t target_count;
 };
 
 
 char *g_socks5_server = 0;
 unsigned g_socks5_port = 9150;
+
+/**
+ * After a configuration parameter, this finds the next argument.
+ * We allow arguments to either be combined or separate. In other
+ * words, here are some examples:
+ * --port 1234
+ * --port=1234
+ * --port:1234
+ */
+static char *
+next_arg(int argc, char *argv[], int *index)
+{
+    char *arg = argv[*index];
+    size_t len;
+    
+    /* Find the length of the named parameter */
+    for (len=0; arg[len]; len++) {
+        if (!isalnum(arg[len]) && arg[len] != '-' && arg[len] != '_')
+            break;
+    }
+    if (arg[len] == ':' || arg[len] == '=')
+        return arg + len + 1;
+    if (arg[len] != '\0' || (*index) + 1 >= argc) {
+        fprintf(stderr, "[-] %.*s: expected following parameter\n", (unsigned)len, arg);
+        exit(1);
+    }
+    return argv[++(*index)];
+}
+
+/**
+ * This matches the name of a double-dash input parameter,
+ * like --port. It's a bit tricky because the name can
+ * be combined with additional data, like "--port=1234".
+ * Therefore, we have to match up to the first of several
+ * possible terminators. Also, we allow the parameters to
+ * be configured in either order.
+ */
+static int
+MATCH(const char *lhs, const char *rhs)
+{
+    if (*lhs != '-')
+        return 0;
+    while (*lhs == '-')
+        lhs++;
+    while (*rhs == '-')
+        rhs++;
+    while (*rhs && *lhs && *rhs == *lhs) {
+        rhs++;
+        lhs++;
+    }
+    if (*rhs == '\0') {
+        if (*lhs == '-')
+            return 0;
+        if (*lhs == '_')
+            return 0;
+        if (isalnum(*lhs))
+            return 0;
+        return 1;
+    }
+    if (*lhs == '\0') {
+        if (*rhs == '-')
+            return 0;
+        if (*rhs == '_')
+            return 0;
+        if (isalnum(*rhs))
+            return 0;
+        return 1;
+    }
+    return 0;
+}
+
+/**
+ * Print help on the command-line. This function will cause the program
+ * to exit without returning. This can be riggered a number of ways:
+ *  -?
+ *  -h
+ *  --help
+ * (no command line parameters, argc==1)
+ */
+static void
+print_help(void)
+{
+    fprintf(stderr, "---- https://github.com/robertdavidgraham/rdpscan ----\n");
+    fprintf(stderr, "This program scans for the Microsoft Remote Desktop vuln CVE-2019-0708\n");
+    fprintf(stderr, "Usage:\n");
+    fprintf(stderr, " rdpscan <addr> [<addr> ...]\n");
+    fprintf(stderr, " rdpscan --file <filename>\n");
+    fprintf(stderr, "This will scan for the addresses specified, either on the command-line\n");
+    fprintf(stderr, "or from a file. Some additional parameters are:\n");
+    fprintf(stderr, " -p <n> or --port <n>\n  The port number (default 3389)\n");
+    fprintf(stderr, " -d or -dd or -ddd\n  Print diagnostic information\n");
+    exit(1);
+}
+
+void
+set_parameter(struct command_line *cfg, int argc, char *argv[], int *index)
+{
+    char *arg = argv[*index];
+    size_t len;
+    
+    /* Find the length of the named parameter */
+    for (len=0; arg[len]; len++) {
+        if (!isalnum(arg[len]) && arg[len] != '-' && arg[len] != '_')
+            break;
+    }
+        
+    if (MATCH("--list", arg) || MATCH("--file", arg)) {
+        arg = next_arg(argc, argv, index);
+        cfg->list_filename = xstrdup(arg);
+    } else if (MATCH(arg, "--help")) {
+        print_help();
+    } else if (MATCH(arg, "--socks5")) {
+        arg = next_arg(argc, argv, index);
+        g_socks5_server = xstrdup(arg);
+    } else if (MATCH(arg, "--socks5port")) {
+        arg = next_arg(argc, argv, index);
+        g_socks5_port = atoi(arg);
+    } else if (MATCH(arg, "--port")) {
+        arg = next_arg(argc, argv, index);
+        g_tcp_port_rdp = atoi(arg);
+        if (g_tcp_port_rdp <= 0 || 65536 <= g_tcp_port_rdp) {
+            fprintf(stderr, "[-] invalid port: %s\n", arg);
+            exit(1);
+        }
+    } else {
+        fprintf(stderr, "[-] unknown param: %s\n", arg);
+        exit(1);
+    }
+}
 
 void
 parse_commandline(struct command_line *cfg, int argc, char *argv[])
@@ -179,70 +309,25 @@ parse_commandline(struct command_line *cfg, int argc, char *argv[])
                 }
                     break;
                 case '-':
-                    if (strncmp(arg, "--list", 6) == 0) {
-                        arg += 6;
-                        if (*arg == 0) {
-                            if (i+1 >= argc) {
-                                fprintf(stderr, "[-] expected filename after --list\n");
-                                exit(1);
-                            } else {
-                                arg = argv[++i];
-                            }
-                        } else if (*arg == ':' || *arg == '=') {
-                            arg++;
-                        }
-                        if (arg[0] == '-' && arg[1] != '\0') {
-                            fprintf(stderr, "[-] expected filename after --list\n");
-                            exit(1);
-                        }
-                        cfg->list_filename = xstrdup(arg);
-                    } else if (strncmp(arg, "--socks5port", 12) == 0) {
-                        arg += 12;
-                        if (*arg == 0) {
-                            if (i+1 >= argc) {
-                                fprintf(stderr, "[-] expected socks5 port\n");
-                                exit(1);
-                            } else {
-                                arg = argv[++i];
-                            }
-                        } else if (*arg == ':' || *arg == '=') {
-                            arg++;
-                        }
-                        if (arg[0] == '-' && arg[1] != '\0') {
-                            fprintf(stderr, "[-] expected socks5 port\n");
-                            exit(1);
-                        }
-                        g_socks5_port = atoi(arg);
-                        
-                    } else if (strncmp(arg, "--socks5", 8) == 0) {
-                        arg += 8;
-                        if (*arg == 0) {
-                            if (i+1 >= argc) {
-                                fprintf(stderr, "[-] expected socks5 server\n");
-                                exit(1);
-                            } else {
-                                arg = argv[++i];
-                            }
-                        } else if (*arg == ':' || *arg == '=') {
-                            arg++;
-                        }
-                        if (arg[0] == '-' && arg[1] != '\0') {
-                            fprintf(stderr, "[-] expected socks5 server\n");
-                            exit(1);
-                        }
-                        g_socks5_server = xstrdup(arg);
-                        
-                    } else {
-                        fprintf(stderr, "[-] unknown param: %s\n", arg);
-                    }
+                    set_parameter(cfg, argc, argv, &i);
+                    break;
+                case '\0':
+                    break;
+                case 'x':
+                    break;
+                case 'h':
+                case '?':
+                    print_help();
+                    break;
+                default:
+                    fprintf(stderr, "[-] unknown parameter: %s\n", argv[i]);
+                    exit(1);
+                    break;
             }
         } else {
-            if (cfg->target) {
-                fprintf(stderr, "[-] only one target parameter allowed, or use --list <filename> for multiple targets\n");
-                exit(1);
-            } else {
-                cfg->target = xstrdup(argv[i]);
-            }
+            cfg->targets = xrealloc(cfg->targets, (cfg->target_count+2) * sizeof(char*));
+            cfg->targets[cfg->target_count++] = xstrdup(argv[i]);
+            cfg->targets[cfg->target_count] = NULL; /* null termiante this list */
         }
     }
     
@@ -259,19 +344,24 @@ int main(int argc, char *argv[])
     struct command_line cfg = {0};
     int err;
     
-    if (argc <= 1) {
-        fprintf(stderr, "Usage:\n rdpscan <target>\n");
-        return 1;
-    }
-
+    /* Parse the command-line. Note that this puts some things in our
+     * configuration structure, but puts other things in global variables.
+     * This program use A LOT of global variables. */
+    if (argc <= 1)
+        print_help();
     parse_commandline(&cfg, argc, argv);
     
     /* If a file of many IP addresses was specified, then instead of
      * scannign them in ths process, spawn worker processes to scan them.
      * that's because this program was designed with lots of global variables,
      * so we can't scan them all in this process */
-    if (cfg.list_filename)
-        return spawn_workers(argv[0], cfg.list_filename, cfg.debug_level, 10);
+    if (cfg.list_filename || cfg.target_count > 1)
+        return spawn_workers(argv[0],
+                             cfg.list_filename,
+                             cfg.targets,
+                             cfg.debug_level,
+                             g_tcp_port_rdp,
+                             100);
     
     /* RDP servers will cache the cookie and reject connections with the same
      * cookie. Therefore, every connection should have it's own cookie */
@@ -287,7 +377,7 @@ int main(int argc, char *argv[])
     /* Do the RDP connection. This is where all the interesting stuff happens */
     flags = RDP_INFO_MOUSE | RDP_INFO_DISABLECTRLALTDEL
     | RDP_INFO_UNICODE | RDP_INFO_MAXIMIZESHELL | RDP_INFO_ENABLEWINDOWSKEY;
-    err = rdp_connect(cfg.target,
+    err = rdp_connect(cfg.targets[0],
                       flags,
                       domain,
                       g_password,

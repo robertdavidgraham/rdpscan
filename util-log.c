@@ -3,7 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-int g_log_level = 1;
+int g_log_level = 0;
 extern char g_targetaddr[];
 extern char g_targetport[];
 
@@ -13,10 +13,10 @@ RESULT(const char *format, ...)
     va_list ap;
     
     if (format[0] == '[' && format[1] != '\0' && format[2] == ']' && format[3] == ' ') {
-        fprintf(stdout, "[%c] ", format[1]);
+        //fprintf(stdout, "[%c] ", format[1]);
         format += 4;
     }
-    fprintf(stdout, "[%s]:%s - ", g_targetaddr, g_targetport);
+    fprintf(stdout, "%-15s - ", g_targetaddr);
     
     va_start(ap, format);
     vfprintf(stdout, format, ap);
@@ -50,8 +50,14 @@ error(char *format, ...)
 {
     va_list ap;
     
-    fprintf(stderr, "[-] ");
-    
+    if (format[0] == '[' && format[1] != '\0' && format[2] == ']' && format[3] == ' ') {
+        fprintf(stderr, "[%c] ", format[1]);
+        format += 4;
+    } else {
+        fprintf(stderr, "[-] ");
+    }
+    fprintf(stderr, "[%s]:%s - ", g_targetaddr, g_targetport);
+
     va_start(ap, format);
     vfprintf(stderr, format, ap);
     va_end(ap);
@@ -63,8 +69,14 @@ warning(char *format, ...)
 {
     va_list ap;
     
-    fprintf(stderr, "[ ] ");
-    
+    if (format[0] == '[' && format[1] != '\0' && format[2] == ']' && format[3] == ' ') {
+        fprintf(stderr, "[%c] ", format[1]);
+        format += 4;
+    } else {
+        fprintf(stderr, "[ ] ");
+    }
+    fprintf(stderr, "[%s]:%s - ", g_targetaddr, g_targetport);
+
     va_start(ap, format);
     vfprintf(stderr, format, ap);
     va_end(ap);

@@ -51,7 +51,7 @@ channel_register(char *name, uint32 flags, void (*callback) (STREAM))
 {
 	VCHANNEL *channel;
 
-    STATUS(2, "[+] register channel: \"%s\"\n", name);
+    STATUS(8, "[+] register channel: \"%s\"\n", name);
 	if (g_rdp_version < RDP_V5)
 		return NULL;
 
