@@ -24,6 +24,13 @@ having stayed up late futzing with development.
     
 In the `results.txt` file, search for those lines containing the string "VULNERABLE".
 
+In reality, you probably care about the diagnostic details about the TCP connections, that
+tell you more than just vulnerability status. If you specified `-d`  these will be printed to
+`stderr`. This is how I run it:
+
+    $ rdpscan --file ips.txt 2> diag.txt 1> results.txt
+
+
 ## Building
 
 The difficult part is getting the OpenSSL libraries installed, and not conflicting
