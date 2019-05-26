@@ -1,10 +1,11 @@
-//struct stream {int x;}
+#define _CRT_SECURE_NO_WARNINGS 1
 #include "rdesktop.h"
 #include "orders.h"
 #include "mst120.h"
 #include "tcp.h"
 #include "util-time.h"
 #include "util-xmalloc.h"
+#include "util-log.h"
 #include "workers.h"
 #include "ranges.h"         /* from masscan */
 #include "rand-blackrock.h" /* from masscan */
@@ -12,8 +13,13 @@
 #include <string.h>
 #include <stdlib.h>
 
+#ifdef WIN32
+#define snprintf _snprintf
+#endif
+
 /* My custom globals */
 char *g_username;
+char g_hostname[16] = "rdpscan";
 
 
 uint8 g_static_rdesktop_salt_16[16] = {
@@ -23,7 +29,6 @@ uint8 g_static_rdesktop_salt_16[16] = {
 
 //char g_title[64] = "";
 char g_password[64] = "";
-char g_hostname[16] = "kali";
 char g_keymapname[PATH_MAX] = "";
 unsigned int g_keylayout = 0x409;    /* Defaults to US keyboard layout */
 int g_keyboard_type = 0x4;    /* Defaults to US keyboard layout */
@@ -496,6 +501,11 @@ int main(int argc, char *argv[])
     
     DEBUG(("Disconnecting...\n"));
     rdp_disconnect();
-    
+
+    if (g_network_error) {
+        RESULT("UNKNOWN - network error\n");
+    } else {
+        RESULT("UNKNOWN - unknown condition\n");
+    }
     return 0;
 }

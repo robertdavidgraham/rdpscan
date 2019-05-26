@@ -34,7 +34,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
-#include <stdbool.h>
 
 #define BUCKET_COUNT 16
 

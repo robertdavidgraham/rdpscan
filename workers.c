@@ -4,6 +4,7 @@
 */
 #define _CRT_SECURE_NO_WARNINGS 1
 #include "workers.h"
+#include <assert.h>
 #include <ctype.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -15,16 +16,24 @@
 #ifdef WIN32
 #define WIN32_LEAN_AND_MEAN 
 #include <Windows.h>
-
-struct spawned
+#include <malloc.h> /* alloca() */
+#include <direct.h> /* getcwd() */
+#define snprintf _snprintf
+#define getcwd _getcwd
+struct tracker
 {
     HANDLE parent_stdout;
     HANDLE parent_stderr;
-    HANDLE hProcess;
-    HANDLE hThread;
+    HANDLE child_stdout;
+    HANDLE child_stderr;
 };
 
-char *my_strerror(DWORD err)
+struct spawned
+{
+    HANDLE hProcess;
+};
+
+static char *my_strerror(DWORD err)
 {
     char* msg = NULL;
     FormatMessageA(
@@ -39,23 +48,12 @@ char *my_strerror(DWORD err)
     //LocalFree( msg );
     return msg;
 }
-static struct spawned
-spawn_program(const char *progname, size_t arg_count, ...)
+
+static void
+tracker_init(struct tracker *t)
 {
     SECURITY_ATTRIBUTES saAttr = {0};
-    DWORD err;
-    HANDLE parent_stdout, child_stdout;
-    HANDLE parent_stderr, child_stderr;
-    PROCESS_INFORMATION proc_info = {0};
-    STARTUPINFO start_info = {0};
     BOOL is_success;
-    char *command_line;
-    size_t command_line_length = strlen(progname) + strlen(argument) + 20;
-
-    /*
-     * Create the command-line from the arguments
-     */
-    sprintf_s(command_line, command_line_length, "%s %s", progname, argument);
 
     /* 
      * Set the inherit flag so that children can inherit handles
@@ -68,26 +66,77 @@ spawn_program(const char *progname, size_t arg_count, ...)
      * Create the pipes, but set the parent half the pipe to non-inheritable,
      * so the child only inherits their side of the pipe.
      */
-    err = CreatePipe(&parent_stdout, &child_stdout, &saAttr, 0);
-    if (err)
+    is_success = CreatePipe(&t->parent_stdout, &t->child_stdout, &saAttr, 0);
+    if (!is_success) {
+        fprintf(stderr, "[-] CreatePipe() %s\n", my_strerror(GetLastError()));
         exit(1);
-    err = SetHandleInformation(parent_stdout, HANDLE_FLAG_INHERIT, 0);
-    if (err)
+    }
+    is_success = SetHandleInformation(t->parent_stdout, HANDLE_FLAG_INHERIT, 0);
+    if (!is_success) {
+        fprintf(stderr, "[-] SetHandleInfo(!INHERIT) %s\n", my_strerror(GetLastError()));
         exit(1);
+    }
 
-    err = CreatePipe(&parent_stderr, &child_stderr, &saAttr, 0);
-    if (err != 0)
+    is_success = CreatePipe(&t->parent_stderr, &t->child_stderr, &saAttr, 0);
+    if (!is_success) {
+        fprintf(stderr, "[-] CreatePipe() %s\n", my_strerror(GetLastError()));
         exit(1);
-    err = SetHandleInformation(parent_stderr, HANDLE_FLAG_INHERIT, 0);
-    if (err)
+    }
+    is_success = SetHandleInformation(t->parent_stderr, HANDLE_FLAG_INHERIT, 0);
+    if (!is_success) {
+        fprintf(stderr, "[-] SetHandleInfo(!INHERIT) %s\n", my_strerror(GetLastError()));
         exit(1);
+    }
 
+}
+static struct spawned
+spawn_program(struct tracker *t, const char *progname, size_t arg_count, ...)
+{
+    PROCESS_INFORMATION proc_info = {0};
+    STARTUPINFO start_info = {0};
+    BOOL is_success;
+    char *command_line;
+    
+    /*
+     * Create the command-line from the arguments
+     */
+    {
+        size_t command_line_length;
+        size_t i;
+        size_t offset;
+        va_list marker;
+        
+        /* Calculate the length of the command-line */
+        command_line_length = strlen(progname) + 1;
+        va_start(marker, arg_count);
+        for (i=0; i<arg_count; i++)
+            command_line_length += strlen(va_arg(marker, char*)) + 1;
+        va_end(marker);
+
+        /* Allocate a buffer for it */
+        command_line = alloca(command_line_length + 1);
+
+        /* Create the command-line */
+        offset = strlen(progname);
+        memcpy(command_line, progname, offset + 1);
+        va_start(marker, arg_count);
+        for (i=0; i<arg_count; i++) {
+            char *arg = va_arg(marker, char*);
+            size_t arglen = strlen(arg);
+            command_line[offset++] = ' ';
+            memcpy(command_line + offset, arg, arglen + 1);
+            offset += arglen;
+        }
+        va_end(marker);
+    }
+
+    
     /*
      * Configure which pipes the child will use
      */
    start_info.cb = sizeof(STARTUPINFO); 
-   start_info.hStdError = child_stderr;
-   start_info.hStdOutput = child_stdout;
+   start_info.hStdError = t->child_stderr;
+   start_info.hStdOutput = t->child_stdout;
    start_info.hStdInput = GetStdHandle(STD_INPUT_HANDLE);
    start_info.dwFlags |= STARTF_USESTDHANDLES;
 
@@ -107,22 +156,17 @@ spawn_program(const char *progname, size_t arg_count, ...)
        exit(1);
    }
 
-   {
-       struct spawned child = {0};
-       child.parent_stderr = parent_stderr;
-       child.parent_stdout = parent_stdout;
-       child.hProcess = proc_info.hProcess;
-       child.hThread = proc_info.hThread;
-
-       return child;
-   }
-    
     /* This should automatically reap zombies, by indicating
      * we are not interested in any return results from the
      * process, only their pipes */
-    CloseHandle(proc_info.hProcess);
+    //CloseHandle(proc_info.hProcess);
     CloseHandle(proc_info.hThread);
 
+   {
+       struct spawned child = {0};
+       child.hProcess = proc_info.hProcess;
+       return child;
+   }
 }
 
 
@@ -148,58 +192,101 @@ my_echo(HANDLE h, FILE *fp, int *closed_count)
  * Reads input from child and parses the results
  */
 static int
-parse_results(struct spawned *children, size_t children_count, unsigned milliseconds)
+parse_results(struct tracker *t, struct spawned *children, size_t children_count, unsigned milliseconds)
 {
+    size_t total_bytes_read = 0;
     int closed_count = 0;
-    size_t i;
-    size_t job;
-    HANDLE errs[MAXIMUM_WAIT_OBJECTS];
-    HANDLE outs[MAXIMUM_WAIT_OBJECTS];
-    //HANDLE quits[MAXIMUM_WAIT_OBJECTS];
-    
-    /* Read all <stderr> */
-    for (job=0; job<children_count; job+=MAXIMUM_WAIT_OBJECTS) {
+    size_t i = 0;
+
+    /*
+     * Reap exited processes. Note that it only reaps a few processes
+     * in each pass, rather than all possible processes.
+     */
+    i = 0;
+    while (i < children_count) {
+        HANDLE handles[MAXIMUM_WAIT_OBJECTS];
+        DWORD handle_count = 0;
         DWORD result;
-        DWORD handle_count;
-            
-        for (i=0; i<MAXIMUM_WAIT_OBJECTS && job+i<job; i++) {
-            errs[i] = children[i].parent_stderr;
-            outs[i] = children[i].parent_stdout;
-            //quits[i] = children[i].hProcess;
-        }
-        handle_count = (DWORD)i;
-            
 
-        for (;;) {
-            result = WaitForMultipleObjects(handle_count, errs, FALSE, 0);
-            
-            if (result == WAIT_TIMEOUT)
+        for (; i<children_count; i++) {
+            handles[handle_count++] = children[i].hProcess;
+            if  (handle_count >= MAXIMUM_WAIT_OBJECTS)
                 break;
-            else if (result == WAIT_FAILED) {
-                fprintf(stderr, "[-] Wait() error: %s\n", my_strerror(GetLastError()));
-                exit(1);
-            }
-            if (WAIT_OBJECT_0 <= result && result <= MAXIMUM_WAIT_OBJECTS) {
-                size_t index = result - WAIT_OBJECT_0;
-                children[i].parent_stderr = my_echo(errs[index], stderr, &closed_count);
-            }
         }
 
-        for (;;) {
-            result = WaitForMultipleObjects(handle_count, outs, FALSE, 0);
-            if (result == WAIT_TIMEOUT)
-                break;
-            else if (result == WAIT_FAILED) {
-                fprintf(stderr, "[-] Wait() error: %s\n", my_strerror(GetLastError()));
-                exit(1);
-            }
-            if (WAIT_OBJECT_0 <= result && result <= MAXIMUM_WAIT_OBJECTS) {
-                size_t index = result - WAIT_OBJECT_0;
-                children[i].parent_stdout = my_echo(outs[index], stderr, &closed_count);
+        /* Test to see if any processes have exited */
+        result = WaitForMultipleObjects(handle_count, handles, FALSE, 0);
+            
+        /* If none have exited, then test the next batch */
+        if (result == WAIT_TIMEOUT)
+            continue;
+
+        /* If there is a catostrophic failure, then print a message and 
+         * exit the program. This shouldn't be possible. */
+        if (result == WAIT_FAILED) {
+            fprintf(stderr, "[-] Wait() error: %s\n", my_strerror(GetLastError()));
+            exit(1);
+        }
+
+        /* When the child process dies, it'll trigger this code below. We 
+         * want to simply close the handle and mark it close, so that we
+         * know that we can open up new processes in its place */
+        if (WAIT_OBJECT_0 <= result && result <= MAXIMUM_WAIT_OBJECTS) {
+            size_t index = (result - WAIT_OBJECT_0) + i - (i % MAXIMUM_WAIT_OBJECTS);
+            
+            assert(children[index].hProcess == handles[result - WAIT_OBJECT_0]);
+            
+            CloseHandle(children[index].hProcess);
+            
+            children[index].hProcess = NULL;
+
+            closed_count++;
+        }
+    }
+
+    /* Now wait for pipe input. All of the processes are writing to the same two
+     * pipes. */
+    for (;;) {
+        char buffer[16384];
+        DWORD length;
+        BOOL is_success;
+        DWORD combined_length = 0;
+
+        if (PeekNamedPipe(t->parent_stdout, 0, 0, 0, &length, 0) && length) {
+            is_success = ReadFile(t->parent_stdout, buffer, sizeof(buffer), &length, 0);
+            if (is_success) {
+                fwrite(buffer, 1, length, stdout);
+
+                /* Remember this so we know if we need to sleep at the end of this function */
+                total_bytes_read += length;
+
+                /* Remember this so we know if we need to break out of this loop */
+                combined_length += length;
             }
         }
-    }    
-    
+        if (PeekNamedPipe(t->parent_stderr, 0, 0, 0, &length, 0) && length) {
+            is_success = ReadFile(t->parent_stderr, buffer, sizeof(buffer), &length, 0);
+            if (is_success) {
+                fwrite(buffer, 1, length, stderr);
+
+                /* Remember this so we know if we need to sleep at the end of this function */
+                total_bytes_read += length;
+
+                /* Remember this so we know if we need to break out of this loop */
+                combined_length += length;
+            }
+        }
+
+        /* Keep looping until there's nothing left to read from either pipe */
+        if (combined_length == 0)
+            break;
+    }
+
+    /* If there was no activity, then do a simple sleep so that we don't
+     * burn through tons of CPU time */
+    if (closed_count == 0 && total_bytes_read == 0)
+        Sleep(milliseconds);
+
     /* Return the number of children that were closed, so that
      * the parent process can cleanup its tracking records */
     return closed_count;
@@ -218,9 +305,10 @@ cleanup_children(struct spawned *children, size_t *children_count)
     for (i = 0; i < *children_count; i++) {
         struct spawned *child = &children[i];
         
-        if (child->parent_stdout == 0 && child->parent_stderr == 0) {
+        if (child->hProcess == NULL) {
             memcpy(child, &children[*children_count - 1], sizeof(*child));
             (*children_count)--;
+            i--;
         }
     }
 }
@@ -231,6 +319,18 @@ cleanup_children(struct spawned *children, size_t *children_count)
 #include <unistd.h>
 #include <sys/select.h>
 #include <fcntl.h>
+
+/* On Windows, we use a single set of pipes that we store here. 
+ * On POSIX, we are creating one pipe per process, though we
+ * may change that model in the future */
+struct tracker
+{
+    int empty;
+};
+static void
+tracker_init(struct tracker *t)
+{
+}
 
 /**
  * A structure for tracking the spawned child program
@@ -248,7 +348,7 @@ struct spawned
  * Do a fork()/exec() to spawn the program
  */
 static struct spawned
-spawn_program(const char *progname, size_t arg_count, ...)
+spawn_program(struct tracker *t, const char *progname, size_t arg_count, ...)
 {
     struct spawned child = {0};
     int err;
@@ -331,7 +431,7 @@ again:
  * Reads input from child and parses the results
  */
 static int
-parse_results(struct spawned *children, size_t children_count, unsigned milliseconds)
+parse_results(struct tracker *t, struct spawned *children, size_t children_count, unsigned milliseconds)
 {
     fd_set fds;
     int nfds = 0;
@@ -417,6 +517,7 @@ parse_results(struct spawned *children, size_t children_count, unsigned millisec
      * the parent process can cleanup its tracking records */
     return closed_count;
 }
+
 /**
  * Called to cleanup any children records after their processes have
  * died. We simply move the entry at the end of the list to fill
@@ -446,7 +547,7 @@ cleanup_children(struct spawned *children, size_t *children_count)
  * after which the operating-system spawn will happen (either POSIX or WIN32)
  */
 static struct spawned
-spawn_worker(const char *progname, const char *address, int debug_level, int port_number)
+spawn_worker(struct tracker *t, const char *progname, const char *address, int debug_level, int port_number)
 {
     char debug[16] = "-dddddddddddddd";
     char port[32];
@@ -469,9 +570,9 @@ spawn_worker(const char *progname, const char *address, int debug_level, int por
     if (g_socks5_server) {
         char port2[32];
         snprintf(port2, sizeof(port2), "--socks5port=%u", g_socks5_port);
-        return spawn_program(progname, 6, address, port, debug, "--socks5", g_socks5_server, port2);
+        return spawn_program(t, progname, 6, address, port, debug, "--socks5", g_socks5_server, port2);
     } else {
-        return spawn_program(progname, 3, address, port, debug);
+        return spawn_program(t, progname, 3, address, port, debug);
     }
 }
 
@@ -485,8 +586,10 @@ spawn_workers(const char *progname,
               unsigned max_children)
 {
     FILE *fp;
+    struct tracker tracker = {0};
     struct spawned *children;
     size_t children_count = 0;
+
     
     /* Automatically reap zombies. Child processes will otherwise stay around
      * in a zombie state after they exit, waiting for the parent to read their
@@ -510,6 +613,7 @@ spawn_workers(const char *progname,
     }
 #endif
     
+    tracker_init(&tracker);
 
     /* Allocate space to track all our spawned workers */
     children = calloc(max_children + 1, sizeof(*children));
@@ -573,14 +677,14 @@ spawn_workers(const char *progname,
         
         /* Now spawn the child */
         child = &children[children_count++];
-        *child = spawn_worker(progname, line, debug_level, rdp_port);
+        *child = spawn_worker(&tracker, progname, line, debug_level, rdp_port);
 
         /* Do this at least once, which slows down how fast we spawn
          * new processes. If we've reached the maximum children count,
          * then we stay stuck here processing children until one
          * of them exits and creates room for a new child */
         do {
-            int closed_count = parse_results(children, children_count, 100);
+            int closed_count = parse_results(&tracker, children, children_count, 100);
             if (closed_count) {
                 cleanup_children(children, &children_count);
             }
@@ -597,14 +701,14 @@ spawn_workers(const char *progname,
         /* Wait until there is space in our list to add the child
          * process */
         while (children_count == max_children) {
-            int closed_count = parse_results(children, children_count, 100);
+            int closed_count = parse_results(&tracker, children, children_count, 100);
             if (closed_count)
                 cleanup_children(children, &children_count);
         }
         
         /* Now spawn the child */
         child = &children[children_count++];
-        *child = spawn_worker(progname, *addresses, debug_level, rdp_port);
+        *child = spawn_worker(&tracker, progname, *addresses, debug_level, rdp_port);
 
         /* Now move to the next address in our list. This is NULL
          * terminated */
@@ -616,12 +720,12 @@ spawn_workers(const char *progname,
      * child processes in various states of execution, so we sit
      * here waiting for them all to exit */
     while (children_count) {
-        int closed_count = parse_results(children, children_count, 100);
+        int closed_count = parse_results(&tracker, children, children_count, 100);
         if (closed_count) {
             cleanup_children(children, &children_count);
         }
     }
-    fprintf(stderr, "[+] FIN\n");
-    
+
+    /* There are no more children left, so now it's time to exit */
     return 0;
 }

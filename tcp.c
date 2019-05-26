@@ -23,7 +23,6 @@
 #define WIN32_LEAN_AND_MEAN 
 #if defined(_MSC_VER)
 #pragma comment(lib, "Ws2_32.lib")
-//#pragma comment(lib, "openssl.lib")
 #pragma comment(lib, "libssl.lib")
 #pragma comment(lib, "libcrypto.lib")
 #endif
@@ -34,6 +33,26 @@
 #define snprintf _snprintf
 #define close(fd) closesocket(fd)
 typedef int ssize_t;
+#undef errno
+#define errno WSAGetLastError()
+
+#define strerror my_strerror
+static char *my_strerror(DWORD err)
+{
+    char* msg = NULL;
+    FormatMessageA(
+        FORMAT_MESSAGE_ALLOCATE_BUFFER | 
+        FORMAT_MESSAGE_FROM_SYSTEM |
+        FORMAT_MESSAGE_IGNORE_INSERTS,
+        NULL,
+        err,
+        MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
+        (LPSTR)&msg,
+        0, NULL );
+    //LocalFree( msg );
+    return msg;
+}
+#define SOCK(err) WSAE##err
 #else
 #include <unistd.h>		/* select read write close */
 #include <sys/socket.h>		/* socket connect setsockopt */
@@ -43,6 +62,7 @@ typedef int ssize_t;
 #include <netinet/tcp.h>	/* TCP_NODELAY */
 #include <arpa/inet.h>		/* inet_addr */
 #include <fcntl.h>
+#include <errno.h>
 #endif
 
 #define IPv6
@@ -53,7 +73,6 @@ typedef int ssize_t;
 
 
 #include <string.h>
-#include <errno.h>
 
 
 #include <openssl/ssl.h>
@@ -61,20 +80,26 @@ typedef int ssize_t;
 #include <openssl/err.h>
 
 
+#ifdef WIN32
+# undef EWOULDBLOCK
+# define EWOULDBLOCK WSAEWOULDBLOCK
+# undef ECONNRESET
+# define ECONNRESET WSAECONNRESET
+# undef EINTR
+# define EINTR WSAEINTR
+# undef EINPROGRESS
+# define EINPROGRESS WSAEINPROGRESS
+# undef ETIMEDOUT
+# define ETIMEDOUT WSAETIMEDOUT
+# undef ECONNREFUSED
+# define ECONNREFUSED WSAECONNREFUSED
+#endif
+
 char g_targetaddr[256];
 char g_targetport[8];
 int g_scan_timeout = 10;
 
 
-#ifdef _WIN32
-#define TCP_CLOSE(_sck) closesocket(_sck)
-#define TCP_STRERROR "tcp error"
-#define TCP_BLOCKS (WSAGetLastError() == WSAEWOULDBLOCK)
-#else
-#define TCP_CLOSE(_sck) close(_sck)
-#define TCP_STRERROR strerror(errno)
-#define TCP_BLOCKS (errno == EWOULDBLOCK)
-#endif
 
 #ifndef INADDR_NONE
 #define INADDR_NONE ((unsigned long) -1)
@@ -199,7 +224,7 @@ tcp_send(STREAM s)
 					scard_unlock(SCARD_LOCK_TCP);
 #endif
 
-					error("SSL_write: %d (%s)\n", ssl_err, TCP_STRERROR);
+					error("SSL_write: %d (%s)\n", ssl_err, strerror(errno));
 					g_network_error = True;
 					return;
 				}
@@ -210,7 +235,7 @@ tcp_send(STREAM s)
 			sent = send(g_sock, s->data + total, length - total, 0);
 			if (sent <= 0)
 			{
-				if (sent == -1 && TCP_BLOCKS)
+				if (sent == -1 && errno == EWOULDBLOCK)
 				{
 					tcp_can_send(g_sock, 100);
 					sent = 0;
@@ -221,7 +246,7 @@ tcp_send(STREAM s)
 					scard_unlock(SCARD_LOCK_TCP);
 #endif
 
-					error("send: %s\n", TCP_STRERROR);
+					error("send: %s\n", strerror(errno));
 					g_network_error = True;
 					return;
 				}
@@ -365,7 +390,7 @@ tcp_recv(STREAM s, uint32 length)
 			}
 			else if (ssl_err != SSL_ERROR_NONE)
 			{
-				STATUS(0, "SSL_read: %d (%s)\n", ssl_err, TCP_STRERROR);
+				STATUS(0, "SSL_read: %d (%s)\n", ssl_err, strerror(errno));
                 RESULT("UNKNOWN - network error\n");
 				g_network_error = True;
 				return NULL;
@@ -389,7 +414,7 @@ tcp_recv(STREAM s, uint32 length)
                             RESULT("UNKNOWN - connection reset by peer\n");
                         break;
                     default:
-                        STATUS(1, "[-] recv: %s\n", TCP_STRERROR);
+                        STATUS(1, "[-] recv: %s\n", strerror(errno));
                         RESULT("UNKNOWN - error: %s\n", strerror(errno));
                         g_network_error = True;
                         return NULL;
@@ -649,7 +674,17 @@ sockets_connect(const char *target, unsigned port)
                 } else if (errcode != 0) {
                     close(fd);
                     fd = -1;
-                    errno = errcode;
+                    switch (errno) {
+                        case EINTR:
+                        case ETIMEDOUT:
+                            STATUS(1, "[-] time out\n");
+                            break;
+                        case ECONNREFUSED:
+                            STATUS(1, "[-] refused\n");
+                            break;
+                        default:
+                            STATUS(1, "[-] failed: %s (%d)\n", strerror(errno), errno);
+                    }
                 }
             }
             if (fd != -1)
@@ -670,7 +705,7 @@ sockets_connect(const char *target, unsigned port)
             default:
                 STATUS(1, "[-] failed: %s (%d)\n", strerror(errno), errno);
         }
-        TCP_CLOSE(fd);
+        close(fd);
         fd = -1;
     }
     freeaddrinfo(result);
@@ -1022,7 +1057,7 @@ tcp_disconnect(void)
 		g_ssl_ctx = NULL;
 	}
 
-	TCP_CLOSE(g_sock);
+	close(g_sock);
 	g_sock = -1;
 }
 

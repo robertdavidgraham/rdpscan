@@ -61,7 +61,7 @@ rangelist_is_contains(const struct RangeList *task, unsigned number);
  * by putting 'begin' after the 'end'
  */
 int
-range_is_valid(const struct Range range);
+range_is_valid(struct Range range);
 
 /**
  * Parses IPv4 addresses out of a string. A number of formats are allowed,
