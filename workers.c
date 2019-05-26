@@ -540,7 +540,7 @@ again:
             fprintf(stderr, "[-] read(): %s\n", strerror(errno));
             exit(1);
         } else {
-            fwrite(buf, 1, count, stdout);
+            fwrite(buf, 1, count, stderr);
         }
     }
     
