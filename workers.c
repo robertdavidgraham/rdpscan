@@ -321,13 +321,19 @@ cleanup_children(struct spawned *children, size_t *children_count)
 #include <fcntl.h>
 #include <sys/time.h>
 #include <sys/resource.h>
+#include <sys/types.h>
+#include <sys/wait.h>
 
 /* On Windows, we use a single set of pipes that we store here. 
  * On POSIX, we are creating one pipe per process, though we
  * may change that model in the future */
 struct tracker
 {
-    int empty;
+    int parent_stdout;
+    int parent_stderr;
+    int child_stdout;
+    int child_stderr;
+    size_t count_closed;
 };
 
 /* On POSIX, we want to disover the limits for filehandles and process
@@ -347,8 +353,7 @@ tracker_init(struct tracker *t, unsigned *max_children)
         exit(1);
     }
     if (g_log_level > 1) {
-        fprintf(stderr, "[ ] nproc = %ld (soft) %ld (hard)\n",
-                (long)limit.rlim_cur, (long)limit.rlim_max);
+        fprintf(stderr, "[ ] nproc = %ld (soft) %ld (hard)\n", (long)limit.rlim_cur, (long)limit.rlim_max);
     }
     if (*max_children > (unsigned)limit.rlim_max - 10 && limit.rlim_max > 10) {
         *max_children = (unsigned)limit.rlim_max - 10;
@@ -365,8 +370,7 @@ tracker_init(struct tracker *t, unsigned *max_children)
         exit(1);
     }
     if (g_log_level > 1) {
-        fprintf(stderr, "[ ] nfile = %ld (soft) %ld (hard)\n",
-                (long)limit.rlim_cur, (long)limit.rlim_max);
+        ;//fprintf(stderr, "[ ] nfile = %ld (soft) %ld (hard)\n", (long)limit.rlim_cur, (long)limit.rlim_max);
     }
     if (*max_children > (unsigned)limit.rlim_max/2 - 5 && limit.rlim_max > 10) {
         *max_children = (unsigned)limit.rlim_max/2 - 5;
@@ -375,6 +379,38 @@ tracker_init(struct tracker *t, unsigned *max_children)
         limit.rlim_cur = limit.rlim_max;
         setrlimit(RLIMIT_NOFILE, &limit);
     }
+
+    /* Create a pipe to get output from children. All children
+     * will write to the same pipe, which could in theory
+     * cause some conflicts, but shouldn't in practice. */
+    {
+        int pipe_stdout[2];
+        int pipe_stderr[2];
+        
+        err = pipe(pipe_stdout);
+        if (err < 0) {
+            fprintf(stderr, "[-] pipe(): %s\n", strerror(errno));
+            exit(1);
+        }
+        err = pipe(pipe_stderr);
+        if (err < 0) {
+            fprintf(stderr, "[-] pipe(): %s\n", strerror(errno));
+            exit(1);
+        }
+        
+        /* Save the pipes that we'll use later */
+        t->parent_stdout = pipe_stdout[0];
+        t->parent_stderr = pipe_stderr[0];
+        t->child_stdout = pipe_stdout[1];
+        t->child_stderr = pipe_stderr[1];
+        
+        /* Configure the parent end of the pipes be be non-inheritable.
+         * In other words, none of the children can read from these
+         * pipes, nor will they exist in child process space */
+        fcntl(t->parent_stdout, F_SETFD, FD_CLOEXEC);
+        fcntl(t->parent_stderr, F_SETFD, FD_CLOEXEC);
+    }
+    
 
 }
 
@@ -385,9 +421,6 @@ struct spawned
 {
     const char *name;
     int pid;
-    int fdout[2];
-    int fderr[2];
-    unsigned is_closed:1;
 };
 
 /**
@@ -397,24 +430,10 @@ static struct spawned
 spawn_program(struct tracker *t, const char *progname, size_t arg_count, ...)
 {
     struct spawned child = {0};
-    int err;
     char **new_argv;
-    
-    /* Create a pipe to get output from child */
-    err = pipe(child.fdout);
-    if (err < 0) {
-        fprintf(stderr, "[-] pipe(): %s\n", strerror(errno));
-        exit(1);
-    }
-    err = pipe(child.fderr);
-    if (err < 0) {
-        fprintf(stderr, "[-] pipe(): %s\n", strerror(errno));
-        exit(1);
-    }
     
     /* Spawn child */
 again:
-    child.is_closed = 0;
     child.pid = fork();
     
     /* Test for fork errors */
@@ -450,25 +469,15 @@ again:
     }
     
     if (child.pid == 0) {
-        /* Close the 'read' end of the pipe, since child only writes to it */
-        close(child.fdout[0]);
-        close(child.fderr[0]);
-        
         /* Set the 'write' end of the pipe 'stdout' */
-        dup2(child.fdout[1], 1);
-        dup2(child.fderr[1], 2);
+        dup2(t->child_stdout, 1);
+        dup2(t->child_stderr, 2);
         
         /* Now execute our child with new program */
         execve(progname, new_argv, 0);
     } else {
-        /* We are the PARENT */
-        
-        /* Close the 'write' end of the pipe, since parent only reads
-         * from it. Set the other end to be non-inheritable by children */
-        close(child.fdout[1]);
-        close(child.fderr[1]);
-        fcntl(child.fdout[0], F_SETFD, FD_CLOEXEC);
-        fcntl(child.fderr[0], F_SETFD, FD_CLOEXEC);
+        /* we are the parent */
+        ;
     }
     return child;
 }
@@ -483,8 +492,7 @@ parse_results(struct tracker *t, struct spawned *children, size_t children_count
     int nfds = 0;
     struct timeval tv;
     int err;
-    size_t i;
-    int closed_count = 0;
+    int closed_count = 1;
 
     tv.tv_sec = milliseconds / 1000;
     tv.tv_usec = (milliseconds * 1000) % 1000000;
@@ -492,70 +500,47 @@ parse_results(struct tracker *t, struct spawned *children, size_t children_count
     
     /* Fill in all the file descriptors */
     FD_ZERO(&fds);
-    for (i=0; i<children_count; i++) {
-        struct spawned *child = &children[i];
-        
-        if (child->fdout[0] != -1) {
-            FD_SET(child->fdout[0], &fds);
-            if (nfds < child->fdout[0])
-                nfds = child->fdout[0];
-        }
-        
-        if (child->fderr[0] != -1) {
-            FD_SET(child->fderr[0], &fds);
-            if (nfds < child->fderr[0])
-                nfds = child->fderr[0];
-        }
-    }
+    FD_SET(t->parent_stdout, &fds);
+    if (nfds < t->parent_stdout)
+        nfds = t->parent_stdout;
+    FD_SET(t->parent_stderr, &fds);
+    if (nfds < t->parent_stderr)
+        nfds = t->parent_stderr;
     
     /* Do the select */
+again:
     err = select(nfds + 1, &fds, 0, 0, &tv);
     if (err < 0) {
+        if (errno == EINTR)
+            goto again; /* A signal from an exiting child interrupted this */
         fprintf(stderr, "[-] select(): %s\n", strerror(errno));
         exit(1);
     } else if (err == 0)
-        return 0; /* okay, timeout */
+        return closed_count; /* okay, timeout */
     
     /* Check all the file descriptors */
-    for (i=0; i<children_count; i++) {
-        struct spawned *child = &children[i];
+    if (FD_ISSET(t->parent_stdout, &fds)) {
+        char buf[16384];
+        ssize_t count;
         
-        /* Check for <stdout> from the child worker */
-        if (child->fdout[0] != -1 && FD_ISSET(child->fdout[0], &fds)) {
-            char buf[512];
-            ssize_t count;
-            
-            count = read(child->fdout[0], buf, sizeof(buf));
-            if (count < 0) {
-                fprintf(stderr, "[-] read(): %s\n", strerror(errno));
-                exit(1);
-            } else if (count == 0) {
-                close(child->fdout[0]);
-                child->fdout[0] = -1;
-                closed_count++;
-            } else {
-                fwrite(buf, 1, count, stdout);
-            }
+        count = read(t->parent_stdout, buf, sizeof(buf));
+        if (count < 0) {
+            fprintf(stderr, "[-] read(): %s\n", strerror(errno));
+            exit(1);
+        } else {
+            fwrite(buf, 1, count, stdout);
         }
+    }
+    if (FD_ISSET(t->parent_stderr, &fds)) {
+        char buf[16384];
+        ssize_t count;
         
-        /* Check for <stderr> from the child worker, this will
-         * be debug messages, which if the debug_level is zero(0),
-         * then there shouldn't be any of this. */
-        if (child->fderr[0] != -1 && FD_ISSET(child->fderr[0], &fds)) {
-            char buf[512];
-            ssize_t count;
-            
-            count = read(child->fderr[0], buf, sizeof(buf));
-            if (count < 0) {
-                fprintf(stderr, "[-] read(): %s\n", strerror(errno));
-                exit(1);
-            } else if (count == 0) {
-                close(child->fderr[0]);
-                child->fderr[0] = -1;
-                closed_count++;
-            } else {
-                fwrite(buf, 1, count, stderr);
-            }
+        count = read(t->parent_stderr, buf, sizeof(buf));
+        if (count < 0) {
+            fprintf(stderr, "[-] read(): %s\n", strerror(errno));
+            exit(1);
+        } else {
+            fwrite(buf, 1, count, stdout);
         }
     }
     
@@ -572,15 +557,40 @@ parse_results(struct tracker *t, struct spawned *children, size_t children_count
 static void
 cleanup_children(struct spawned *children, size_t *children_count)
 {
-    size_t i;
-    
-    for (i = 0; i < *children_count; i++) {
-        struct spawned *child = &children[i];
+    for (;;) {
+        int pid;
         
-        if (child->fdout[0] == -1 && child->fderr[0] == -1) {
-            memcpy(child, &children[*children_count - 1], sizeof(*child));
-            (*children_count)--;
-            i--;
+        /* Reap children.
+         * The first parameter is set to -1 to indicate that we want
+         * information about ANY of our children processes.
+         * The second paremeter is set to NULL to indicate that we
+         * aren't interested in knowing the status/result code from
+         * the process.
+         * The third parameter is WNOHHANG, meaning that we want to return
+         * immediately
+         */
+        pid = waitpid(-1, 0, WNOHANG);
+        
+        if (pid > 0) {
+            /* If we get back a valid PID, that means the child process
+             * has terminated. We want to decrement our count by one
+             * then loop around looking for more child processes. */
+            (*children_count) --;
+            //fprintf(stderr, "[ ] children left = %u\n", (unsigned)*children_count);
+            continue;
+        } else if (pid == 0) {
+            /* if none of our children are currently exited, then this
+             * value of zero is returned. */
+            break;
+        } else if (pid == -1 && errno == ECHILD) {
+            /* In this condition, there are no child processes. In this
+             * case, we just want to handle this the same as pid=0 */
+            //fprintf(stderr, "[ ] no children left\n");
+            break;
+        } else if (pid < 0) {
+            /* Some extraordinary error occured */
+            //fprintf(stderr, "[-] waitpid() %s\n", strerror(errno));
+            exit(1);
         }
     }
 }
@@ -636,29 +646,6 @@ spawn_workers(const char *progname,
     struct spawned *children;
     size_t children_count = 0;
 
-    
-    /* Automatically reap zombies. Child processes will otherwise stay around
-     * in a zombie state after they exit, waiting for the parent to read their
-     * return values. By doing this, we indicate we aren't interested in reading
-     * the return values, and that the operating system should clean them
-     * up quickly. */
-#ifdef SIGCHLD
-    if (signal(SIGCHLD, SIG_IGN) == SIG_ERR) {
-        perror("signal(SIGCHLD, SIG_IGN)");
-        exit(1);
-    }
-#endif
-
-    /* Make sure that the number of children cannot exceed the total
-     * number of file descriptors that we can have in a select()
-     * statement */
-#ifdef FD_SETSIZE
-    if (max_children > FD_SETSIZE/2 - 4) {
-        max_children = FD_SETSIZE/2 - 4;
-        fprintf(stderr, "[ ] max children = %u\n", max_children);
-    }
-#endif
-    
     tracker_init(&tracker, &max_children);
 
     /* Allocate space to track all our spawned workers */
