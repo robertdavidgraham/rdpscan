@@ -267,8 +267,23 @@ spawn_program(const char *progname, size_t arg_count, ...)
     }
     
     /* Spawn child */
+again:
     child.is_closed = 0;
     child.pid = fork();
+    
+    /* Test for fork errors */
+    if (child.pid == -1 && errno == EAGAIN) {
+        /* we've run out of max processes for this user, so wait and try again,
+         * hopefull some of the processes will have exited in the meantime */
+        static int is_printed = 0;
+        if (is_printed++ == 0)
+            fprintf(stderr, "[-] fork() hit process limit\n");
+        sleep(1);
+        goto again;
+    } else if (child.pid == -1) {
+        fprintf(stderr, "[-] fork() error: %s\n", strerror(errno));
+        exit(1);
+    }
     
     /* Setup child parameters */
     {
