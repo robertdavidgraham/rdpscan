@@ -11,6 +11,8 @@ This is highly flakey and experimental. You are likely to have lots of problems,
 you can try contacting me on Twitter (@erratarob) for help. Or maybe I'll be asleep
 having stayed up late futzing with development.
 
+ - 2019-05-26 - fixing the Windows networking issues
+ - 2019-05-25 - Linux and macOS working well, Windows has a few network errors
  - 2019-05-24 - works on Linux and macOS, Windows has a few compilation bugs
  - 2019-05-23 - currently working on macOS within XCode
  
