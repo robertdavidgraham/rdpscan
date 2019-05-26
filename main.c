@@ -194,6 +194,10 @@ struct command_line
     const char *list_filename;
     char **targets;
     size_t target_count;
+    
+    /** Maximum number of worker processes when scanning
+     * multiple targets/ranges. Default is around 100. */
+    int max_workers;
 };
 
 
@@ -317,10 +321,27 @@ set_parameter(struct command_line *cfg, int argc, char *argv[], int *index)
         arg = next_arg(argc, argv, index);
         g_socks5_port = atoi(arg);
     } else if (MATCH(arg, "--port")) {
+        /* The port which we should scan on. If not specified, this will
+         * be 3389, the defined RDP port. However, servers can be configured
+         * for other ports instead */
         arg = next_arg(argc, argv, index);
         g_tcp_port_rdp = atoi(arg);
         if (g_tcp_port_rdp <= 0 || 65536 <= g_tcp_port_rdp) {
             fprintf(stderr, "[-] invalid port: %s\n", arg);
+            exit(1);
+        }
+    } else if (MATCH(arg, "--workers")) {
+        /* When scanning ranges or multiple addresses, we have to spawn
+         * worker processes (because the original rdesktop code uses
+         * a lot of global variables). This setting determines
+         * how many workers we can spawn. The default is 100 workers.
+         * Larger values can either hit operating system limits
+         * (e.g. 700 workers for macOS), or hit practical resource
+         * constraints making the operating system extremely slow. */
+        arg = next_arg(argc, argv, index);
+        cfg->max_workers = atoi(arg);
+        if (cfg->max_workers <= 0 || 65536 <= cfg->max_workers) {
+            fprintf(stderr, "[-] invalid workers: %s\n", arg);
             exit(1);
         }
     } else {
@@ -392,6 +413,7 @@ int main(int argc, char *argv[])
      * This program use A LOT of global variables. */
     if (argc <= 1)
         print_help();
+    cfg.max_workers = 100; /* default */
     parse_commandline(&cfg, argc, argv);
     
     /* See if we have a single IPv4 range, in which case we expand
@@ -455,7 +477,7 @@ int main(int argc, char *argv[])
                              cfg.targets,
                              cfg.debug_level,
                              g_tcp_port_rdp,
-                             100);
+                             cfg.max_workers);
     
     /* RDP servers will cache the cookie and reject connections with the same
      * cookie. Therefore, every connection should have it's own cookie */

@@ -50,7 +50,7 @@ static char *my_strerror(DWORD err)
 }
 
 static void
-tracker_init(struct tracker *t)
+tracker_init(struct tracker *t, unsigned *max_children)
 {
     SECURITY_ATTRIBUTES saAttr = {0};
     BOOL is_success;
@@ -319,6 +319,8 @@ cleanup_children(struct spawned *children, size_t *children_count)
 #include <unistd.h>
 #include <sys/select.h>
 #include <fcntl.h>
+#include <sys/time.h>
+#include <sys/resource.h>
 
 /* On Windows, we use a single set of pipes that we store here. 
  * On POSIX, we are creating one pipe per process, though we
@@ -327,9 +329,53 @@ struct tracker
 {
     int empty;
 };
+
+/* On POSIX, we want to disover the limits for filehandles and process
+ * creation. */
 static void
-tracker_init(struct tracker *t)
+tracker_init(struct tracker *t, unsigned *max_children)
 {
+    struct rlimit limit;
+    int err;
+    extern int g_log_level;
+    
+    /* Discover how many child processes we can have active at
+     * a time. */
+    err = getrlimit(RLIMIT_NPROC, &limit);
+    if (err) {
+        fprintf(stderr, "[-] getrlimit() %s\n", strerror(errno));
+        exit(1);
+    }
+    if (g_log_level > 1) {
+        fprintf(stderr, "[ ] nproc = %ld (soft) %ld (hard)\n",
+                (long)limit.rlim_cur, (long)limit.rlim_max);
+    }
+    if (*max_children > (unsigned)limit.rlim_max - 10 && limit.rlim_max > 10) {
+        *max_children = (unsigned)limit.rlim_max - 10;
+    }
+    if (limit.rlim_cur + 10 < *max_children) {
+        limit.rlim_cur = limit.rlim_max;
+        setrlimit(RLIMIT_NPROC, &limit);
+    }
+
+    /* Discover how many file descriptors we can have open */
+    err = getrlimit(RLIMIT_NOFILE, &limit);
+    if (err) {
+        fprintf(stderr, "[-] getrlimit() %s\n", strerror(errno));
+        exit(1);
+    }
+    if (g_log_level > 1) {
+        fprintf(stderr, "[ ] nfile = %ld (soft) %ld (hard)\n",
+                (long)limit.rlim_cur, (long)limit.rlim_max);
+    }
+    if (*max_children > (unsigned)limit.rlim_max/2 - 5 && limit.rlim_max > 10) {
+        *max_children = (unsigned)limit.rlim_max/2 - 5;
+    }
+    if (limit.rlim_cur + 10 < *max_children * 2) {
+        limit.rlim_cur = limit.rlim_max;
+        setrlimit(RLIMIT_NOFILE, &limit);
+    }
+
 }
 
 /**
@@ -613,7 +659,7 @@ spawn_workers(const char *progname,
     }
 #endif
     
-    tracker_init(&tracker);
+    tracker_init(&tracker, &max_children);
 
     /* Allocate space to track all our spawned workers */
     children = calloc(max_children + 1, sizeof(*children));

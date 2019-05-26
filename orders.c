@@ -1384,7 +1384,7 @@ process_orders(STREAM s, uint16 num_orders)
 
             {
                 static unsigned count = 0;
-                STATUS(3, "[+] %5u order = %u\n", count++, os->order_type);
+                STATUS(5, "[+] %5u order = %u\n", count++, os->order_type);
             }
             switch (os->order_type)
 			{

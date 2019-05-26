@@ -52,7 +52,7 @@ mst120_send_check_packet(size_t size, size_t offset)
     }
     else
     {
-        STATUS(2, "[+] Sending MS_T120 check packet (size: 0x%lx - offset: 0x%lx)\n",
+        STATUS(4, "[+] Sending MS_T120 check packet (size: 0x%lx - offset: 0x%lx)\n",
                size, offset);
     }
 
