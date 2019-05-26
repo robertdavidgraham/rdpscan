@@ -758,6 +758,9 @@ spawn_workers(const char *progname,
             cleanup_children(children, &children_count);
         }
     }
+    
+    /* Clean up any remaining pipe stuff */
+    parse_results(&tracker, children, children_count, 100);
 
     /* There are no more children left, so now it's time to exit */
     return 0;

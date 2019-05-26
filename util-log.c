@@ -39,7 +39,7 @@ RESULT(const char *format, ...)
     
     /* Now do the single atomi print */
     va_start(ap, format);
-    vfprintf(stderr, newfmt, ap);
+    vfprintf(stdout, newfmt, ap);
     va_end(ap);
 
     exit(0);
