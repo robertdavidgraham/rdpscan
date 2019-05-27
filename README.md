@@ -1,5 +1,5 @@
 [![Windows download](/badges/binary-windows.svg)](https://github.com/robertdavidgraham/rdpscan/releases/tag/v0.0.1)
-<a href="https://twitter.com/intent/follow?screen_name=erratarob"><img src="https://img.shields.io/twitter/follow/erratarob.svg?style=social&logo=twitter" alt="follow on Twitter"></a>
+[![Follow](/badges/erratarob.svg)](https://twitter.com/intent/follow?screen_name=erratarob)
 
 # rdpscan for CVE-2019-0708 bluekeep vuln
 
