@@ -37,7 +37,7 @@ using `rdpscan` to scan those resulting machines for the vulnerability.
 
 Or, in one step, piping the output of one to the other:
 
-    masscan 10.0.0.0/8 -p3389 --rate 1000000 | rdpsca --file -
+    masscan 10.0.0.0/8 -p3389 --rate 1000000 | rdpscan --file -
     
 You can get more verbose diagnostic details using the `-d` parameter, which gets
 printed to `sterr`. This is how I usually run the program:
