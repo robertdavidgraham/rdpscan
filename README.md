@@ -1,3 +1,7 @@
+<a href="https://twitter.com/intent/follow?screen_name=erratarob">
+        <img src="https://img.shields.io/twitter/follow/erratarob.svg?style=social&logo=twitter"
+            alt="follow on Twitter"></a>
+
 # rdpscan for CVE-2019-0708 bluekeep vuln
 
 This is a quick-and-dirty scanner for the CVE-2019-0708 vulnerability.
@@ -11,6 +15,7 @@ This is only a couple days old and experimental. However, I am testing it by sca
 the entire Internet (with the help of `masscan`, so I'm working through a lot of problems
 pretty quickly. You can try contacting me on twttier(@erratarob) for help/comments.
 
+ - 2019-05-27 - I've released a [Windows binary](https://github.com/robertdavidgraham/rdpscan/files/3222715/rdpscan.zip), macOS binary coming tomorrow
  - 2019-05-26 - fixing the Windows networking issues
  - 2019-05-25 - Linux and macOS working well, Windows has a few network errors
  - 2019-05-24 - works on Linux and macOS, Windows has a few compilation bugs
@@ -37,7 +42,7 @@ using `rdpscan` to scan those resulting machines for the vulnerability.
 
 Or, in one step, piping the output of one to the other:
 
-    masscan 10.0.0.0/8 -p3389 --rate 1000000 | rdpsca --file -
+    masscan 10.0.0.0/8 -p3389 --rate 1000000 | rdpscan --file -
     
 You can get more verbose diagnostic details using the `-d` parameter, which gets
 printed to `sterr`. This is how I usually run the program:
