@@ -7,9 +7,9 @@ as well as added the ability to scan multiple targets.
 
 ## Status
 
-This is highly flakey and experimental. You are likely to have lots of problems, but
-you can try contacting me on Twitter (@erratarob) for help. Or maybe I'll be asleep
-having stayed up late futzing with development.
+This is only a couple days old and experimental. However, I am testing it by scanning
+the entire Internet (with the help of `masscan`, so I'm working through a lot of problems
+pretty quickly. You can try contacting me on twttier(@erratarob) for help/comments.
 
  - 2019-05-26 - fixing the Windows networking issues
  - 2019-05-25 - Linux and macOS working well, Windows has a few network errors
@@ -18,25 +18,37 @@ having stayed up late futzing with development.
  
  ## Primary use
  
- The primary way of using this tool is first using `masscan` to scan for the port,
- then using tool to probe those ports that are listening. An example is:
+ To scan a network, run it like the following:
  
-    $ masscan 0.0.0.0/0 -p3389 >ips.txt
-    $ rdpscan --file ips.txt > results.txt
+    rdpscan 192.168.1.1-192.168.1.1.255
     
-In the `results.txt` file, search for those lines containing the string "VULNERABLE".
+This will print a one-line result per address, indicating *VULNERABLE* if it's
+vulnerable to the bug, *SAFE* if it's (probably) safe, or *UNKNOWN* if the
+program couldn't figureo ut the status, such as getting no response from
+the target. Since most targets won't respond, statistically, most will be *UNKNOWN".
 
-In reality, you probably care about the diagnostic details about the TCP connections, that
-tell you more than just vulnerability status. If you specified `-d`  these will be printed to
-`stderr`. This is how I run it:
+It's fairly slow. You can increase the speed by adding the command-line parameter
+`--workers 1000`. But you can increase the speed even further by front-ending
+it with `masscan` first to quickly finding with port 3389 available, and then only
+using `rdpscan` to scan those resulting machines for the vulnerability.
+ 
+    masscan 10.0.0.0/8 -p3389 --rate 1000000 >ips.txt
+    rdpscan --file ips.txt > results.txt
 
-    $ rdpscan --file ips.txt 2> diag.txt 1> results.txt
+Or, in one step, piping the output of one to the other:
 
+    masscan 10.0.0.0/8 -p3389 --rate 1000000 | rdpsca --file -
+    
+You can get more verbose diagnostic details using the `-d` parameter, which gets
+printed to `sterr`. This is how I usually run the program:
+
+    rdpscan --file ips.txt 2> diag.txt 1> results.txt
+    
 
 ## Building
 
-The difficult part is getting the OpenSSL libraries installed, and not conflicting
-with other versions of OpenSSL on the system. On Debian Linux, I do:
+The difficult part is getting the *OpenSSL* libraries installed, and not conflicting
+with other versions on the system. On Debian Linux, I do:
 
     $ sudo apt install libssl-dev
 
@@ -89,16 +101,24 @@ by hard-coding the paths:
 
     $ gcc *.c -lssl -lcrypto -I/usr/local/include -L/usr/local/lib -o rdpscan
 
+According to comments by others, the following command-line might work on macOS
+if you've used Homebrew to install things. I still get the linking errors above, though,
+because I've installed other OpenSSL components that are conflicting.
+
+    gcc $(brew --prefix)/opt/openssl/lib/libssl.a $(brew --prefix)/opt/openssl/lib/libcrypto.a -o rdpscan *.c
 
 
 ## Running
 
-Just run the program with an IP address:
+The section above gives quickstart tips for running the program. This section gives
+more in-depth help.
+
+To scan a single target, just pass the address of the target:
 
     ./rdpscan 192.168.10.101
     
-You can scan multiple targets at once. Instead of IPv4 addresses, they can be
-DNS names or IPv6 addresses.
+You can pass in IPv6 addresses and DNS names. You can pass in multiple targets.
+An example of this would be:
 
     ./rdpscan 192.168.10.101 exchange.example.com 2001:0db8:85a3::1
     
@@ -107,15 +127,25 @@ or IPv4 CIDR spec. IPv6 ranges aren't supported because they are so big.
 
     ./rdpscan 10.0.0.1-10.0.0.25 192.168.0.0/16
 
-You can scan zillions of targets at once by loading address from a `--file` instead.
-The format is each address should be alone on a line. Whitespace is ignored.
-Lines starting with punctuation (except '[', which can be part of IPv6 address) is 
-a comment and ignored, though the prefered comment mark is `#` or `//`.
+By default, it scans only 100 targets at a time. You can increase this number
+with the `--workers` parameter. However, no matter how high you set this
+parameter, in practice you'll get a max of around 500 to 1500 workers running
+at once, depending upon your system.
+
+    ./rdpscan --workers 1000 10.0.0.0/24
+
+Instead of specifying targets on the command-line, you can load them
+from a file instead, using the well-named `--file` parameter:
 
     ./rdpscan --file ips.txt
 
-This just dumps results to `stdout`, whether they are VULNERABLE, SAFE, or UNKNOWN.
-There could be additional reasons for each.
+The format of the file is one address, name, or range per line. It can also
+consume the text generated by `masscan`. Extra whitespace is trimmed,
+blank lines ignored, any any comment lines are ignored. A *comment* is
+a line starting with the `#` character, or `//` characters.
+
+The output is sent to `stdout` giving the status of  VULNERABLE, SAFE, 
+or UNKNOWN. There could be additional reasons for each.
 
     149.129.120.24  - UNKNOWN - FIN received
     45.60.213.160   - SAFE - not RDP but HTTP
@@ -127,9 +157,15 @@ There could be additional reasons for each.
     69.62.158.174   - VULNERABLE -- got appid
     92.111.20.13    - SAFE - Target appears patched
 
+You can process this with additional unix commands like `grep` and `cut`.
+To get a list of just vulnerable machiens:
+
+    ./rdpscan 10.0.0.0/8 | grep 'VULN' | cut -f1 -d'-'
+    
 Those marked "UNKNOWN" are probably worth scanning later, especially
 for "FIN received", which usually means the other side terminated the connection
-early because of delay on the Internet.
+early because of delay on the Internet. Save them into a file, and then read
+back on the next scan with the `--file` option.
 
 Whether "CredSSP required" (meaning NLA required) is "SAFE" is debatable.
 It means it requires a password
