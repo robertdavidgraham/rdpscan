@@ -1,3 +1,7 @@
+<a href="https://twitter.com/intent/follow?screen_name=erratarob">
+        <img src="https://img.shields.io/twitter/follow/erratarob.svg?style=social&logo=twitter"
+            alt="follow on Twitter"></a>
+
 # rdpscan for CVE-2019-0708 bluekeep vuln
 
 This is a quick-and-dirty scanner for the CVE-2019-0708 vulnerability.
