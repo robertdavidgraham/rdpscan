@@ -5,7 +5,7 @@
 
 This is a quick-and-dirty scanner for the CVE-2019-0708 vulnerability in Microsoft Remote Desktop.
 Right now, there are about 700,000 machines on the public Internet vulnerable to this vulnerability,
-compared to about 2,000,000 machines that are patched/safe from exploitation. Many expect that in
+compared to about 2,000,000 machines that have Remote Desktop exposed, but are patched/safe from exploitation. Many expect that in
 the next few months a devestating Internet worm will appear similar to WannaCry and notPetya.
 Therefore, scan your networks and patch your systems. This tool makes it easy to scan your networks
 to find vulnerable machines.
