@@ -26,7 +26,7 @@ This is only a couple days old and experimental. However, I am testing it by sca
 the entire Internet (with the help of `masscan`, so I'm working through a lot of problems
 pretty quickly. You can try contacting me on twttier(@erratarob) for help/comments.
 
- - 2019-05-27 - I've released a [Windows binary](https://github.com/robertdavidgraham/rdpscan/files/3222715/rdpscan.zip), macOS binary coming tomorrow. For Linux, I've tested on x64 and Raspbian, but I won't provide binaries (source is easy to compile with no dependencies other than SSL).
+ - 2019-05-27 - Windows and macOS binaries released (click on badges above). You Linux peeps get only source as usual. It seems to be working well on all three platforms.
  - 2019-05-26 - fixing the Windows networking issues
  - 2019-05-25 - Linux and macOS working well, Windows has a few network errors
  - 2019-05-24 - works on Linux and macOS, Windows has a few compilation bugs
