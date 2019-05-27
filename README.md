@@ -3,8 +3,18 @@
 
 # rdpscan for CVE-2019-0708 bluekeep vuln
 
-This is a quick-and-dirty scanner for the CVE-2019-0708 vulnerability.
-This is based entirely on the `rdesktop` patch from https://github.com/zerosum0x0/CVE-2019-0708.
+This is a quick-and-dirty scanner for the CVE-2019-0708 vulnerability in Microsoft Remote Desktop.
+Right now, there are about 700,000 machines on the public Internet vulnerable to this vulnerability,
+compared to about 2,000,000 machines that are patched/safe from exploitation. Many expect that in
+the next few months a devestating Internet worm will appear similar to WannaCry and notPetya.
+Therefore, scan your networks and patch your systems. This tool makes it easy to scan your networks
+to find vulnerable machines.
+
+To use this tool, you can download a "binary" to run from the command line, or you can download
+the source and compile it. For Windows, there's a [precompiled binary](https://github.com/robertdavidgraham/rdpscan/releases/tag/v0.0.1)
+available.
+
+This tool is based entirely on the `rdesktop` patch from https://github.com/zerosum0x0/CVE-2019-0708.
 I've simply trimmed the code so that I can easily compile on macOS and Windows,
 as well as added the ability to scan multiple targets.
 
