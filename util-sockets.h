@@ -30,6 +30,7 @@ extern const char *$strerror(int err);
 #define $ETIMEDOUT      WSAETIMEDOUT
 #define $ECONNABORTED   WSAECONNABORTED
 #define $ECONNREFUSED   WSAECONNREFUSED
+#define $EBADF          WSAEBADF
 
 #else
 #include <unistd.h>		/* select read write close */
@@ -48,6 +49,7 @@ extern const char *$strerror(int err);
 #define $ETIMEDOUT      ETIMEDOUT
 #define $ECONNABORTED   ECONNABORTED
 #define $ECONNREFUSED   ECONNREFUSED
+#define $EBADF          EBADF
 #define $strerror(err)  strerror(err)
 #define $errno          errno
 #define $close(fd)      close(fd)

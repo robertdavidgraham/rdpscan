@@ -392,6 +392,7 @@ tcp_tls_connect(void)
 {
 	int err;
 	long options;
+    time_t timeof_ssl_start;
 
 	if (!g_ssl_initialized)
 	{
@@ -446,9 +447,14 @@ tcp_tls_connect(void)
 		goto fail;
 	}
 
+    timeof_ssl_start = time(0);
 	do
 	{
 		err = SSL_connect(g_ssl);
+        if (timeof_ssl_start + g_scan_timeout < time(0)) {
+            RESULT("UNKNOWN - SSL connect timeout\n");
+            break;
+        }
 	}
 	while (SSL_get_error(g_ssl, err) == SSL_ERROR_WANT_READ);
 
@@ -631,13 +637,13 @@ sockets_connect(const char *target, unsigned port)
                     switch ($errno) {
                         case $EINTR:
                         case $ETIMEDOUT:
-                            STATUS(1, "[-] time out\n");
+                            STATUS(1, "[-] connect time out\n");
                             break;
                         case $ECONNREFUSED:
-                            STATUS(1, "[-] refused\n");
+                            STATUS(1, "[-] connect refused\n");
                             break;
                         default:
-                            STATUS(1, "[-] failed: %s (%d)\n", $strerror($errno), $errno);
+                            STATUS(1, "[-] connect failed: %s (%d) [%d]\n", $strerror($errno), $errno, fd);
                     }
                 }
             }
@@ -654,10 +660,10 @@ sockets_connect(const char *target, unsigned port)
                 STATUS(1, "[-] time out\n");
                 break;
             case $ECONNREFUSED:
-                STATUS(1, "[-] refused\n");
+                STATUS(1, "[-] connect refused\n");
                 break;
             default:
-                STATUS(1, "[-] failed: %s (%d)\n", $strerror($errno), $errno);
+                STATUS(1, "[-] connect failed: %s (%d) [%d]\n", $strerror($errno), $errno, fd);
         }
         $close(fd);
         fd = -1;
