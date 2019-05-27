@@ -82,6 +82,11 @@ tcp_can_receive(int sck, int millis)
     struct timeval time;
     int sel_count;
     
+    if (sck <= 0 || FD_SETSIZE <= sck) {
+        STATUS(0, "SELECT FAILURE %d\n", sck);
+        RESULT("UNKNOWN - connection terminated\n");
+        exit(1);
+    }
     time.tv_sec = millis / 1000;
     time.tv_usec = (millis * 1000) % 1000000;
     FD_ZERO(&wfds);
