@@ -1,8 +1,14 @@
+#define _CRT_SECURE_NO_WARNINGS 1
 #include "util-log.h"
 #include <string.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
+
+#ifdef WIN32
+#include <malloc.h> /* alloca() */
+#define snprintf _snprintf
+#endif
 
 int g_log_level = 0;
 extern char g_targetaddr[];
@@ -21,8 +27,8 @@ RESULT(const char *format, ...)
      * fprintf() statements, we are going to combine into a single
      * statement. This means creating a new format string. */
     newfmt_length = 14+1; /* strlen("[-] []: - ") */
-    newfmt_length += strlen(g_targetaddr);
-    newfmt_length += strlen(format);
+    newfmt_length += (int)strlen(g_targetaddr);
+    newfmt_length += (int)strlen(format);
     
     /* Kludge: format string attack protection */
     {
@@ -72,9 +78,9 @@ vSTATUS(int lvl, char plus, const char *format, va_list ap)
      * fprintf() statements, we are going to combine into a single
      * statement. This means creating a new format string. */
     newfmt_length = 14+1; /* strlen("[-] []: - ") */
-    newfmt_length += strlen(g_targetaddr);
-    newfmt_length += strlen(g_targetport);
-    newfmt_length += strlen(format);
+    newfmt_length += (int)strlen(g_targetaddr);
+    newfmt_length += (int)strlen(g_targetport);
+    newfmt_length += (int)strlen(format);
     
     /* Kludge: format string attack protection */
     {

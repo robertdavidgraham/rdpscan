@@ -245,7 +245,7 @@ iso_connect(char *server, char *username, char *domain, char *password,
         if (s->end - s->data > 7 && memcmp(s->data, "HTTP/1.", 7) == 0) {
             RESULT("SAFE - not RDP but HTTP\n");
         } else if (s->end - s->data > 7 && memcmp(s->data, "SSH-2.0", 7) == 0) {
-                RESULT("SAFE - not RDP but SSH\n");
+            RESULT("SAFE - not RDP but SSH\n");
         } else
             RESULT("SAFE - protocol error\n");
 		tcp_disconnect();
@@ -292,9 +292,9 @@ iso_connect(char *server, char *username, char *domain, char *password,
 				case HYBRID_REQUIRED_BY_SERVER:
                     /* [CVE-2019-0708] I'm told when this is the case, then the
                      * target is not vulnerable */
-					reason = "CredSSP required by server";
-                    STATUS(1, "[-] connect fail: %s\n", reason);
-                    RESULT("SAFE - CredSSP required\n");
+					reason = "CredSSP/NLA required by server";
+                    STATUS(1, "[-] negotiate fail: %s\n", reason);
+                    RESULT("SAFE - CredSSP/NLA required\n");
 					break;
 				default:
 					reason = "unknown reason";
@@ -304,13 +304,12 @@ iso_connect(char *server, char *username, char *domain, char *password,
 
 			if (retry_without_neg)
 			{
-				fprintf(stderr,
-					"Failed to negotiate protocol, retrying with plain RDP.\n");
+				STATUS(1, "[-] negotiate fail: wrong protocol, retrying with plain RDP.\n");
 				g_negotiate_rdp_protocol = False;
 				goto retry;
 			}
 
-            STATUS(0, "[-] connect fail: %s\n", reason);
+            STATUS(0, "[-] negotiate fail: %s\n", reason);
 			return False;
 		}
 

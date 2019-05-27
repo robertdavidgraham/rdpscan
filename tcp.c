@@ -19,98 +19,28 @@
    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 #define _CRT_SECURE_NO_WARNINGS 1
-#ifdef WIN32
-#define WIN32_LEAN_AND_MEAN 
-#if defined(_MSC_VER)
-#pragma comment(lib, "Ws2_32.lib")
-#pragma comment(lib, "libssl.lib")
-#pragma comment(lib, "libcrypto.lib")
-#endif
-#include <WinSock2.h>
-#include <WS2tcpip.h>
-#include <intrin.h>
-#include <process.h>
-#define snprintf _snprintf
-#define close(fd) closesocket(fd)
-typedef int ssize_t;
-#undef errno
-#define errno WSAGetLastError()
-
-#define strerror my_strerror
-static char *my_strerror(DWORD err)
-{
-    char* msg = NULL;
-    FormatMessageA(
-        FORMAT_MESSAGE_ALLOCATE_BUFFER | 
-        FORMAT_MESSAGE_FROM_SYSTEM |
-        FORMAT_MESSAGE_IGNORE_INSERTS,
-        NULL,
-        err,
-        MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
-        (LPSTR)&msg,
-        0, NULL );
-    //LocalFree( msg );
-    return msg;
-}
-#define SOCK(err) WSAE##err
-#else
-#include <unistd.h>		/* select read write close */
-#include <sys/socket.h>		/* socket connect setsockopt */
-#include <sys/time.h>		/* timeval */
-#include <netdb.h>		/* gethostbyname */
-#include <netinet/in.h>		/* sockaddr_in */
-#include <netinet/tcp.h>	/* TCP_NODELAY */
-#include <arpa/inet.h>		/* inet_addr */
-#include <fcntl.h>
-#include <errno.h>
-#endif
-
-#define IPv6
-
+#include "util-sockets.h"
 #include "rdesktop.h"
 #include "util-xmalloc.h"
 #include "util-log.h"
-
-
 #include <string.h>
-
 
 #include <openssl/ssl.h>
 #include <openssl/x509.h>
 #include <openssl/err.h>
 
 
-#ifdef WIN32
-# undef EWOULDBLOCK
-# define EWOULDBLOCK WSAEWOULDBLOCK
-# undef ECONNRESET
-# define ECONNRESET WSAECONNRESET
-# undef EINTR
-# define EINTR WSAEINTR
-# undef EINPROGRESS
-# define EINPROGRESS WSAEINPROGRESS
-# undef ETIMEDOUT
-# define ETIMEDOUT WSAETIMEDOUT
-# undef ECONNREFUSED
-# define ECONNREFUSED WSAECONNREFUSED
-#endif
-
+/*
+ * GLOBALS
+ */
 char g_targetaddr[256];
 char g_targetport[8];
 int g_scan_timeout = 10;
-
-
-
-#ifndef INADDR_NONE
-#define INADDR_NONE ((unsigned long) -1)
-#endif
-
 #ifdef WITH_SCARD
 #define STREAM_COUNT 8
 #else
 #define STREAM_COUNT 1
 #endif
-
 static RD_BOOL g_ssl_initialized = False;
 static SSL *g_ssl = NULL;
 static SSL_CTX *g_ssl_ctx = NULL;
@@ -122,6 +52,7 @@ int g_tcp_port_rdp = 3389;
 extern RD_BOOL g_user_quit;
 extern RD_BOOL g_network_error;
 extern RD_BOOL g_reconnect_loop;
+
 
 /* wait till socket is ready to write or timeout */
 static RD_BOOL
@@ -224,7 +155,7 @@ tcp_send(STREAM s)
 					scard_unlock(SCARD_LOCK_TCP);
 #endif
 
-					error("SSL_write: %d (%s)\n", ssl_err, strerror(errno));
+					error("SSL_write: %d (%s)\n", ssl_err, $strerror($errno));
 					g_network_error = True;
 					return;
 				}
@@ -235,7 +166,7 @@ tcp_send(STREAM s)
 			sent = send(g_sock, s->data + total, length - total, 0);
 			if (sent <= 0)
 			{
-				if (sent == -1 && errno == EWOULDBLOCK)
+				if (sent == -1 && $errno == $EWOULDBLOCK)
 				{
 					tcp_can_send(g_sock, 100);
 					sent = 0;
@@ -246,7 +177,7 @@ tcp_send(STREAM s)
 					scard_unlock(SCARD_LOCK_TCP);
 #endif
 
-					error("send: %s\n", strerror(errno));
+					error("send: %s\n", $strerror($errno));
 					g_network_error = True;
 					return;
 				}
@@ -329,18 +260,20 @@ tcp_recv(STREAM s, uint32 length)
                  * a period of time, we data still remains to be sent without
                  * anything being received, we'll report that as as "result"
                  */
-                int err;
                 int unsent_count = 0;
                 socklen_t sizeof_count = sizeof(unsent_count);
 
 
                 /* See if there is unsent data */
-#ifdef SO_NWRITE                
-                err = getsockopt(g_sock, SOL_SOCKET, SO_NWRITE, &unsent_count, &sizeof_count);
-                if (err) {
-                    STATUS(1, "[-] getsockopt(SO_NWRITE) error %s\n", strerror(errno));
-                } else {
-                    STATUS(1, "[-] SO_NWRITE = %d\n", unsent_count);
+#ifdef SO_NWRITE        
+                {
+                    int err;
+                    err = getsockopt(g_sock, SOL_SOCKET, SO_NWRITE, &unsent_count, &sizeof_count);
+                    if (err) {
+                        STATUS(1, "[-] getsockopt(SO_NWRITE) error %s\n", $strerror($errno));
+                    } else {
+                        STATUS(1, "[-] SO_NWRITE = %d\n", unsent_count);
+                    }
                 }
 #endif
                 
@@ -390,7 +323,7 @@ tcp_recv(STREAM s, uint32 length)
 			}
 			else if (ssl_err != SSL_ERROR_NONE)
 			{
-				STATUS(0, "SSL_read: %d (%s)\n", ssl_err, strerror(errno));
+				STATUS(0, "SSL_read: %d (%s)\n", ssl_err, $strerror($errno));
                 RESULT("UNKNOWN - network error\n");
 				g_network_error = True;
 				return NULL;
@@ -403,19 +336,29 @@ tcp_recv(STREAM s, uint32 length)
 			rcvd = recv(g_sock, s->end, length, 0);
 			if (rcvd < 0)
 			{
-                switch (errno) {
-                    case EWOULDBLOCK:
+                switch ($errno) {
+                    case $EWOULDBLOCK:
                         rcvd = 0;
                         break;
-                    case ECONNRESET:
+                    case $ECONNRESET:
                         if (total_data_received)
                             RESULT("UNKNOWN - connection reset on connect\n");
                         else
                             RESULT("UNKNOWN - connection reset by peer\n");
                         break;
+                    case $ECONNABORTED:
+                        /* This happens on Windows when the TCP window is full
+                         * on connect. */
+                        STATUS(1, "connection aborted\n");
+                        if (total_data_received == 0) {
+                            RESULT("UNKNOWN - zero TCP window on connect\n");
+                        } else {
+                            RESULT("UNKNOWN - connection aborted\n");
+                        }
+                        break;
                     default:
-                        STATUS(1, "[-] recv: %s\n", strerror(errno));
-                        RESULT("UNKNOWN - error: %s\n", strerror(errno));
+                        STATUS(1, "[-] recv: %s\n", $strerror($errno));
+                        RESULT("UNKNOWN - error: %s\n", $strerror($errno));
                         g_network_error = True;
                         return NULL;
                 }
@@ -616,7 +559,7 @@ sockets_connect(const char *target, unsigned port)
         /* Create a potential socket to use */
         fd = (int)socket(ai->ai_family, ai->ai_socktype, ai->ai_protocol);
         if (fd < 0) {
-            STATUS(1, "[-] socket() failed: %s\n", strerror(errno));
+            STATUS(1, "[-] socket() failed: %s\n", $strerror($errno));
             continue;
         }
         
@@ -651,14 +594,14 @@ sockets_connect(const char *target, unsigned port)
         }
         
         /* If non-blocking, then wait for results */
-        if (errno == EWOULDBLOCK || errno == EINTR || errno == EINPROGRESS)
+        if ($errno == $EWOULDBLOCK || $errno == $EINTR || $errno == $EINPROGRESS)
         {
             time_t timeof_start = time(0);
             while (!tcp_can_send(fd, 100)) {
                 if (timeof_start + g_scan_timeout < time(0)) {
                     STATUS(1, "[-] connect: timeout\n");
                     RESULT("UNKNOWN - connect timeout\n");
-                    close(fd);
+                    $close(fd);
                     fd = -1;
                     break;
                 }
@@ -668,22 +611,22 @@ sockets_connect(const char *target, unsigned port)
                 socklen_t sizeof_errcode = sizeof(errcode);
                 err = getsockopt(fd, SOL_SOCKET, SO_ERROR, (char*)&errcode, &sizeof_errcode);
                 if (err != 0) {
-                    STATUS(1, "[-] getsockopt() error: %s\n", strerror(errno));
-                    close(fd);
+                    STATUS(1, "[-] getsockopt() error: %s\n", $strerror($errno));
+                    $close(fd);
                     fd = -1;
                 } else if (errcode != 0) {
-                    close(fd);
+                    $close(fd);
                     fd = -1;
-                    switch (errno) {
-                        case EINTR:
-                        case ETIMEDOUT:
+                    switch ($errno) {
+                        case $EINTR:
+                        case $ETIMEDOUT:
                             STATUS(1, "[-] time out\n");
                             break;
-                        case ECONNREFUSED:
+                        case $ECONNREFUSED:
                             STATUS(1, "[-] refused\n");
                             break;
                         default:
-                            STATUS(1, "[-] failed: %s (%d)\n", strerror(errno), errno);
+                            STATUS(1, "[-] failed: %s (%d)\n", $strerror($errno), $errno);
                     }
                 }
             }
@@ -694,18 +637,18 @@ sockets_connect(const char *target, unsigned port)
         /* We did not get a connection, but if this is a DNS name we were
          * given, then there may be more IP addresses in the list, so loop
          * around and try again */
-        switch (errno) {
-            case EINTR:
-            case ETIMEDOUT:
+        switch ($errno) {
+            case $EINTR:
+            case $ETIMEDOUT:
                 STATUS(1, "[-] time out\n");
                 break;
-            case ECONNREFUSED:
+            case $ECONNREFUSED:
                 STATUS(1, "[-] refused\n");
                 break;
             default:
-                STATUS(1, "[-] failed: %s (%d)\n", strerror(errno), errno);
+                STATUS(1, "[-] failed: %s (%d)\n", $strerror($errno), $errno);
         }
-        close(fd);
+        $close(fd);
         fd = -1;
     }
     freeaddrinfo(result);
@@ -715,16 +658,16 @@ sockets_connect(const char *target, unsigned port)
      * if we cannot connect */
     if (fd == -1)
     {
-        switch (errno) {
-            case EINTR:
-            case ETIMEDOUT:
+        switch ($errno) {
+            case $EINTR:
+            case $ETIMEDOUT:
                 RESULT("UNKNOWN - connect timeout\n");
                 break;
-            case ECONNREFUSED:
+            case $ECONNREFUSED:
                 RESULT("UNKNOWN - connect refused\n");
                 break;
             default:
-                RESULT("UNKNOWN - connect failed %d\n", errno);
+                RESULT("UNKNOWN - connect failed %d\n", $errno);
         }
         return -1;
     }
@@ -785,9 +728,10 @@ socks_send(int fd, const unsigned char *buf, size_t length)
     while (offset < length)
     {
         ssize_t bytes_sent;
+
         if (timeof_start + g_scan_timeout < time(0)) {
             STATUS(1, "[-] SOCKS5: timeout\n");
-            close(fd);
+            $close(fd);
             return -1;
         }
         if (!tcp_can_send(fd, 100))
@@ -795,8 +739,8 @@ socks_send(int fd, const unsigned char *buf, size_t length)
         
         bytes_sent = send(fd, buf + offset, (int)(length - offset), 0);
         if (bytes_sent < 0) {
-            STATUS(1, "[-] SOCKS: send(): %s\n", strerror(errno));
-            close(fd);
+            STATUS(1, "[-] SOCKS: send(): %s\n", $strerror($errno));
+            $close(fd);
             return -1;
         } else
             offset += bytes_sent;
@@ -818,7 +762,7 @@ socks_receive(int fd, const unsigned char *buf, size_t length)
         
         if (timeof_start + g_scan_timeout < time(0)) {
             STATUS(1, "[-] SOCKS5: timeout\n");
-            close(fd);
+            $close(fd);
             return -1;
         }
         
@@ -827,8 +771,8 @@ socks_receive(int fd, const unsigned char *buf, size_t length)
         
         bytes_received = recv(fd, (char*)buf + offset, (int)(length - offset), 0);
         if (bytes_received < 0) {
-            STATUS(1, "[-] SOCKS: recv(): %s\n", strerror(errno));
-            close(fd);
+            STATUS(1, "[-] SOCKS: recv(): %s\n", $strerror($errno));
+            $close(fd);
             return -1;
         } else
             offset += bytes_received;
@@ -901,7 +845,7 @@ socks5_connect(const char *socks_host, unsigned socks_port,
         return -1;
     if (buf[0] != 5 || buf[1] != 0) {
         STATUS(1, "[-] SOCKS5: bad connect response\n");
-        close(fd);
+        $close(fd);
         return -1;
     }
     
@@ -973,7 +917,7 @@ socks5_connect(const char *socks_host, unsigned socks_port,
             break;
         default:
             STATUS(1, "[-] SOCKS5: unknown response\n");
-            close(fd);
+            $close(fd);
             fd = -1;
             break;
     }
@@ -981,11 +925,11 @@ socks5_connect(const char *socks_host, unsigned socks_port,
         return -1;
     if (buf[0] != 5) {
         STATUS(1, "[-] SOCKS5: unknown response\n");
-        close(fd);
+        $close(fd);
         fd = -1;
     } else if (buf[1] != 0) {
         STATUS(1, "[-] SOCKS5: error #%u\n", buf[1]);
-        close(fd);
+        $close(fd);
         fd = -1;
     }
     
@@ -1057,7 +1001,7 @@ tcp_disconnect(void)
 		g_ssl_ctx = NULL;
 	}
 
-	close(g_sock);
+	$close(g_sock);
 	g_sock = -1;
 }
 

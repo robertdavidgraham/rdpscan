@@ -208,8 +208,8 @@ parse_results(struct tracker *t, struct spawned *children, size_t children_count
         DWORD handle_count = 0;
         DWORD result;
 
-        for (; i<children_count; i++) {
-            handles[handle_count++] = children[i].hProcess;
+        for (; i<children_count; ) {
+            handles[handle_count++] = children[i++].hProcess;
             if  (handle_count >= MAXIMUM_WAIT_OBJECTS)
                 break;
         }
@@ -232,9 +232,19 @@ parse_results(struct tracker *t, struct spawned *children, size_t children_count
          * want to simply close the handle and mark it close, so that we
          * know that we can open up new processes in its place */
         if (WAIT_OBJECT_0 <= result && result <= MAXIMUM_WAIT_OBJECTS) {
-            size_t index = (result - WAIT_OBJECT_0) + i - (i % MAXIMUM_WAIT_OBJECTS);
+            size_t index;
             
-            assert(children[index].hProcess == handles[result - WAIT_OBJECT_0]);
+            index = i;
+            if (index % MAXIMUM_WAIT_OBJECTS == 0)
+                index -= MAXIMUM_WAIT_OBJECTS;
+            else
+                index -= index % MAXIMUM_WAIT_OBJECTS;
+            index += (result - WAIT_OBJECT_0);
+            
+            if (children[index].hProcess != handles[result - WAIT_OBJECT_0]) {
+                fprintf(stderr, "bug\n");
+                abort();
+            }
             
             CloseHandle(children[index].hProcess);
             
