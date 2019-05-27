@@ -101,6 +101,7 @@ vSTATUS(int lvl, char plus, const char *format, va_list ap)
     
     /* Now do the single atomi print */
     vfprintf(stderr, newfmt, ap);
+    fflush(stderr);
 }
 
 void

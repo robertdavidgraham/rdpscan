@@ -20,6 +20,7 @@
 #include <direct.h> /* getcwd() */
 #define snprintf _snprintf
 #define getcwd _getcwd
+
 struct tracker
 {
     HANDLE parent_stdout;
@@ -93,7 +94,7 @@ static struct spawned
 spawn_program(struct tracker *t, const char *progname, size_t arg_count, ...)
 {
     PROCESS_INFORMATION proc_info = {0};
-    STARTUPINFO start_info = {0};
+    STARTUPINFOA start_info = {0};
     BOOL is_success;
     char *command_line;
     
@@ -134,7 +135,7 @@ spawn_program(struct tracker *t, const char *progname, size_t arg_count, ...)
     /*
      * Configure which pipes the child will use
      */
-   start_info.cb = sizeof(STARTUPINFO); 
+   start_info.cb = sizeof(STARTUPINFOA); 
    start_info.hStdError = t->child_stderr;
    start_info.hStdOutput = t->child_stdout;
    start_info.hStdInput = GetStdHandle(STD_INPUT_HANDLE);

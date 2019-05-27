@@ -23,6 +23,7 @@
 #include "rdesktop.h"
 #include "util-xmalloc.h"
 #include "util-log.h"
+#include "util-time.h"
 #include <string.h>
 
 #include <openssl/ssl.h>
@@ -332,7 +333,7 @@ tcp_recv(STREAM s, uint32 length)
 		else
 		{
             tcp_can_receive(g_sock, 1000);
-            
+
 			rcvd = recv(g_sock, s->end, length, 0);
 			if (rcvd < 0)
 			{
@@ -428,6 +429,16 @@ tcp_tls_connect(void)
 		error("tcp_tls_connect: SSL_new() failed\n");
 		goto fail;
 	}
+
+    /* Turn off non-blocking */
+ #ifdef WIN32
+        {
+            ULONG yes = 0;
+            ioctlsocket(g_sock, FIONBIO, &yes);
+        }
+#else
+        fcntl(g_sock, F_SETFL, fcntl(g_sock, F_GETFL) | ~O_NONBLOCK);
+#endif
 
 	if (SSL_set_fd(g_ssl, g_sock) < 1)
 	{

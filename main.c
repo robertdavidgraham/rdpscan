@@ -424,7 +424,7 @@ int main(int argc, char *argv[])
         struct Range range;
         struct RangeList list = {0};
         size_t i;
-        size_t count;
+        uint64_t count;
         struct BlackRock br;
         
         /* Free the old list and reset it to NULL */
