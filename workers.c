@@ -358,6 +358,7 @@ tracker_init(struct tracker *t, unsigned *max_children)
     
     /* Discover how many child processes we can have active at
      * a time. */
+#ifdef RLIMIT_NPROC
     err = getrlimit(RLIMIT_NPROC, &limit);
     if (err) {
         fprintf(stderr, "[-] getrlimit() %s\n", strerror(errno));
@@ -373,6 +374,7 @@ tracker_init(struct tracker *t, unsigned *max_children)
         limit.rlim_cur = limit.rlim_max;
         setrlimit(RLIMIT_NPROC, &limit);
     }
+#endif
 
     /* Discover how many file descriptors we can have open */
     err = getrlimit(RLIMIT_NOFILE, &limit);
