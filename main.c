@@ -372,6 +372,22 @@ parse_commandline(struct command_line *cfg, int argc, char *argv[])
                     }
                 }
                     break;
+                case 'p':
+                    if (arg[2] == '\0')
+                        arg = argv[++i];
+                    else
+                        arg = arg + 2;
+                    if (i >= argc) {
+                        fprintf(stderr, "[-] expected port number after -p\n");
+                        exit(1);
+                    }
+                    g_tcp_port_rdp = atoi(arg);
+                    if (g_tcp_port_rdp <= 0 || 65536 <= g_tcp_port_rdp) {
+                        fprintf(stderr, "[-] invalid port: %s\n", arg);
+                        exit(1);
+                    }
+                    break;
+
                 case '-':
                     set_parameter(cfg, argc, argv, &i);
                     break;
@@ -415,6 +431,8 @@ int main(int argc, char *argv[])
         print_help();
     cfg.max_workers = 100; /* default */
     parse_commandline(&cfg, argc, argv);
+    if (cfg.list_filename == NULL && cfg.target_count == 0)
+        print_help();
     
     /* See if we have a single IPv4 range, in which case we expand
      * this into a larger range */

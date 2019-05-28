@@ -346,13 +346,13 @@ iso_connect(char *server, char *username, char *domain, char *password,
 			}
 
 			/* do not use encryption when using TLS */
-			fprintf(stderr, "Connection established using CredSSP.\n");
+			STATUS(1, "Connection established using CredSSP.\n");
 			g_encryption = False;
 		}
 #endif
 		else if (data == PROTOCOL_RDP)
 		{
-			fprintf(stderr, "[+] Connection established using plain RDP.\n");
+			STATUS(1, "[+] Connection established using plain RDP.\n");
 		}
 		else if (data != PROTOCOL_RDP)
 		{
