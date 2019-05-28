@@ -35,7 +35,7 @@ char *
 xstrdup(const char *s)
 {
     char *mem;
-#ifdef WIN32
+#ifdef _WIN32
 #define strdup(x) _strdup(x)
 #endif
     mem = strdup(s);

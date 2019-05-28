@@ -82,11 +82,13 @@ tcp_can_receive(int sck, int millis)
     struct timeval time;
     int sel_count;
     
+#ifndef WIN32
     if (sck <= 0 || FD_SETSIZE <= sck) {
         STATUS(0, "SELECT FAILURE %d\n", sck);
         RESULT("UNKNOWN - connection terminated\n");
         exit(1);
     }
+#endif
     time.tv_sec = millis / 1000;
     time.tv_usec = (millis * 1000) % 1000000;
     FD_ZERO(&wfds);
@@ -356,15 +358,11 @@ tcp_recv(STREAM s, uint32 length)
                         /* This happens on Windows when the TCP window is full
                          * on connect. */
                         STATUS(1, "connection aborted\n");
-                        if (total_data_received == 0) {
-                            RESULT("UNKNOWN - zero TCP window on connect\n");
-                        } else {
-                            RESULT("UNKNOWN - connection aborted\n");
-                        }
+                        RESULT("UNKNOWN - connection aborted\n");
                         break;
                     default:
                         STATUS(1, "[-] recv: %s\n", $strerror($errno));
-                        RESULT("UNKNOWN - error: %s\n", $strerror($errno));
+                        RESULT("UNKNOWN - error: (%d) %s\n", (int)$errno, $strerror($errno));
                         g_network_error = True;
                         return NULL;
                 }
@@ -621,8 +619,14 @@ sockets_connect(const char *target, unsigned port)
             time_t timeof_start = time(0);
             while (!tcp_can_send(fd, 100)) {
                 if (timeof_start + g_scan_timeout < time(0)) {
+                    extern int g_result_quiet;
                     STATUS(1, "[-] connect: timeout\n");
-                    RESULT("UNKNOWN - connect timeout\n");
+                    /* If there is absolutely no response from the system,
+                     * not a SYN-ACK or a RST, then don't print anything.
+                     * When scanning large ranges, this is the norm */
+                    if (!g_result_quiet)
+                        RESULT("UNKNOWN - connect timeout\n");
+                    exit(0);
                     $close(fd);
                     fd = -1;
                     break;

@@ -7,7 +7,7 @@
 #define UTIL_SOCKETS_H
 #include <stdio.h>
 
-#ifdef WIN32
+#ifdef _WIN32
 #if defined(_MSC_VER)
 #define WIN32_LEAN_AND_MEAN 
 #endif

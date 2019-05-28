@@ -20,7 +20,8 @@
 /* My custom globals */
 char *g_username;
 char g_hostname[16] = "rdpscan";
-
+int g_result_quiet = 0;
+int g_result_verbose = 0;
 
 uint8 g_static_rdesktop_salt_16[16] = {
     0xb8, 0x82, 0x29, 0x31, 0xc5, 0x39, 0xd9, 0x44,
@@ -293,7 +294,9 @@ print_help(void)
     fprintf(stderr, "This will scan for the addresses specified, either on the command-line\n");
     fprintf(stderr, "or from a file. Some additional parameters are:\n");
     fprintf(stderr, " -p <n> or --port <n>\n  The port number (default 3389)\n");
-    fprintf(stderr, " -d or -dd or -ddd\n  Print diagnostic information\n");
+    fprintf(stderr, " -d or -dd or -ddd\n  Print diagnostic information to stderr\n");
+    fprintf(stderr, " -q quiet, don't print result for non-existent systems (default=many addresses)\n");
+    fprintf(stderr, " -v verbose, do print result for non-existent systems (default=single address)\n");
     exit(1);
 }
 
@@ -393,7 +396,12 @@ parse_commandline(struct command_line *cfg, int argc, char *argv[])
                     break;
                 case '\0':
                     break;
-                case 'x':
+                case 'q':
+                    g_result_quiet = 1;
+                    break;
+                case 'v':
+                    g_result_quiet = 0;
+                    g_result_verbose = 1;
                     break;
                 case 'h':
                 case '?':

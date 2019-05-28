@@ -23,7 +23,7 @@
 #include "constants.h"
 #include <limits.h>
 #include <time.h>
-#ifdef WIN32
+#ifdef _WIN32
 typedef int DIR;
 #else
 #include <dirent.h>

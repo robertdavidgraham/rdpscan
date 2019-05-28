@@ -13,7 +13,7 @@
 #include <signal.h>
 #include <stdarg.h>
 
-#ifdef WIN32
+#ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN 
 #include <Windows.h>
 #include <malloc.h> /* alloca() */
@@ -326,7 +326,7 @@ cleanup_children(struct spawned *children, size_t *children_count)
 
 #endif
 
-#ifndef WIN32
+#ifndef _WIN32
 #include <unistd.h>
 #include <sys/select.h>
 #include <fcntl.h>
@@ -631,7 +631,12 @@ spawn_worker(struct tracker *t, const char *progname, const char *address, int d
     }
     debug[debug_level + 1] = '\0';
     if (debug_level == 0) {
-        memcpy(debug, "-x", 3); /* stub param to ignore when no diag present */
+        extern int g_result_verbose;
+        if (g_result_verbose)
+            memcpy(debug, "-v", 3); /* make unresponsive IP addresses verbose */
+        else
+            memcpy(debug, "-q", 3); /* make unresponsive IP addresses quiet */
+
     }
     
     if (g_socks5_server) {
@@ -656,6 +661,7 @@ spawn_workers(const char *progname,
     struct tracker tracker = {0};
     struct spawned *children;
     size_t children_count = 0;
+    extern int g_log_level;
 
     tracker_init(&tracker, &max_children);
 
@@ -677,8 +683,8 @@ spawn_workers(const char *progname,
         if (fp == NULL) {
             char buf[512];
             fprintf(stderr, "[-] %s: %s\n", filename, strerror(errno));
-            getcwd(buf, sizeof(buf));
-            fprintf(stderr, "[-] cwd = %s\n", buf);
+            if (getcwd(buf, sizeof(buf)))
+				fprintf(stderr, "[-] cwd = %s\n", buf);
             return 1;
         }
     }
@@ -734,7 +740,7 @@ spawn_workers(const char *progname,
             }
         } while (children_count == max_children);
     }
-    if (fp)
+    if (fp && g_log_level)
         fprintf(stderr, "[+] done reading file\n");
     
     /* If addresses were specified on the command-line, then add
