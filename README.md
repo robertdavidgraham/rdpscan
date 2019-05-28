@@ -36,7 +36,7 @@ pretty quickly. You can try contacting me on twttier(@erratarob) for help/commen
  
  To scan a network, run it like the following:
  
-    rdpscan 192.168.1.1-192.168.1.1.255
+    rdpscan 192.168.1.1-192.168.1.255
     
 This will print a one-line result per address, indicating *VULNERABLE* if it's
 vulnerable to the bug, *SAFE* if it's (probably) safe, or *UNKNOWN* if the
