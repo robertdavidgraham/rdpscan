@@ -1,5 +1,5 @@
-[![Windows download](/badges/binary-windows.svg)](https://github.com/robertdavidgraham/rdpscan/files/3225043/rdpscan-windows.zip)
-[![macOS download](/badges/binary-macos.svg)](https://github.com/robertdavidgraham/rdpscan/files/3225042/rdpscan-macos.zip)
+[![Windows download](/badges/binary-windows.svg)](https://github.com/robertdavidgraham/rdpscan/files/3226661/rdpscan-windows.zip)
+[![macOS download](/badges/binary-macos.svg)](https://github.com/robertdavidgraham/rdpscan/files/3226663/rdpscan-macos.zip)
 [![Linux download](/badges/source-linux.svg)](https://github.com/robertdavidgraham/rdpscan/archive/v0.0.2.zip)
 [![Follow](/badges/erratarob.svg)](https://twitter.com/intent/follow?screen_name=erratarob)
 
