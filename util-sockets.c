@@ -3,8 +3,8 @@
 #define WIN32_LEAN_AND_MEAN 
 #if defined(_MSC_VER)
 #pragma comment(lib, "Ws2_32.lib")
-#pragma comment(lib, "libssl.lib")
-#pragma comment(lib, "libcrypto.lib")
+#pragma comment(lib, "libssl_static.lib")
+#pragma comment(lib, "libcrypto_static.lib")
 #endif
 #include <WinSock2.h>
 #include <WS2tcpip.h>

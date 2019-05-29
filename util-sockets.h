@@ -20,6 +20,7 @@
 #define $close(fd) closesocket(fd)
 typedef int ssize_t;
 #define $errno WSAGetLastError()
+#define $sleep(n) Sleep((n) * 1000)
 
 extern const char *$strerror(int err);
 
@@ -31,6 +32,8 @@ extern const char *$strerror(int err);
 #define $ECONNABORTED   WSAECONNABORTED
 #define $ECONNREFUSED   WSAECONNREFUSED
 #define $EBADF          WSAEBADF
+#define $ENETUNREACH    WSAENETUNREACH
+#define $EHOSTUNREACH   WSAEHOSTUNREACH
 
 #else
 #include <unistd.h>		/* select read write close */
@@ -55,6 +58,7 @@ extern const char *$strerror(int err);
 #define $strerror(err)  strerror(err)
 #define $errno          errno
 #define $close(fd)      close(fd)
+#define $sleep(n)       sleep(n)
 #endif
 
 #ifndef INADDR_NONE

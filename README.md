@@ -6,15 +6,13 @@
 # rdpscan for CVE-2019-0708 bluekeep vuln
 
 This is a quick-and-dirty scanner for the CVE-2019-0708 vulnerability in Microsoft Remote Desktop.
-Right now, there are about 700,000 machines on the public Internet vulnerable to this vulnerability,
-compared to about 2,000,000 machines that have Remote Desktop exposed, but are patched/safe from exploitation. Many expect that in
-the next few months a devestating Internet worm will appear similar to WannaCry and notPetya.
-Therefore, scan your networks and patch your systems. This tool makes it easy to scan your networks
-to find vulnerable machines.
+Right now, there are about 900,000 machines on the public Internet vulnerable to this vulnerability,
+so many are expect a worm soon like WannaCry and notPetya. Therefore, scan your networks and
+patch (or at least, enable NLA) on vulnerable systems.
 
-To use this tool, you can download a "binary" to run from the command line, or you can download
-the source and compile it. For Windows, there's a [precompiled binary](https://github.com/robertdavidgraham/rdpscan/releases/tag/v0.0.1)
-available.
+This is a command-line tool. You can download the source and compile it
+yourself, or you can download one of the pre-compiled binaries for 
+Windows or macOS from the link above.
 
 This tool is based entirely on the `rdesktop` patch from https://github.com/zerosum0x0/CVE-2019-0708.
 I've simply trimmed the code so that I can easily compile on macOS and Windows,
@@ -22,11 +20,12 @@ as well as added the ability to scan multiple targets.
 
 ## Status
 
-This is only a couple days old and experimental. However, I am testing it by scanning
+This is only a few days old and experimental. However, I am testing it by scanning
 the entire Internet (with the help of `masscan`, so I'm working through a lot of problems
 pretty quickly. You can try contacting me on twttier(@erratarob) for help/comments.
 
- - 2019-05-27 - Windows and macOS binaries released (click on badges above). You Linux peeps get only source as usual. It seems to be working well on all three platforms.
+ - 2019-05-38 - Better output classification
+ - 2019-05-27 - Windows and macOS binaries released (click on badges above).
  - 2019-05-26 - fixing the Windows networking issues
  - 2019-05-25 - Linux and macOS working well, Windows has a few network errors
  - 2019-05-24 - works on Linux and macOS, Windows has a few compilation bugs
@@ -38,28 +37,150 @@ pretty quickly. You can try contacting me on twttier(@erratarob) for help/commen
  
     rdpscan 192.168.1.1-192.168.1.1.255
     
-This will print a one-line result per address, indicating *VULNERABLE* if it's
-vulnerable to the bug, *SAFE* if it's (probably) safe, or *UNKNOWN* if the
-program couldn't figureo ut the status, such as getting no response from
-the target. Since most targets won't respond, statistically, most will be *UNKNOWN".
+This produces one of 3 results for each address:
+    - SAFE - if target has determined bot be *patched* or at least require *CredSSP/NLA*
+    - VULNERABLE - if the target has been confirmed to be vulnerable
+    - UNKNOWN - if the target doesn't respond or has some protocol failure
 
-It's fairly slow. You can increase the speed by adding the command-line parameter
-`--workers 1000`. But you can increase the speed even further by front-ending
-it with `masscan` first to quickly finding with port 3389 available, and then only
-using `rdpscan` to scan those resulting machines for the vulnerability.
- 
-    masscan 10.0.0.0/8 -p3389 --rate 1000000 >ips.txt
-    rdpscan --file ips.txt > results.txt
+When nothing exists at a target IP address, the older versions pritned the
+message "*UNKNOWN - connection timed out*". When scanning large networks,
+this produces an overload of too much information about systems you don't
+care about. Therefore, the new version by default doesn't produce this
+information unless you add *-v* (for verbose) on the command-line.
 
-Or, in one step, piping the output of one to the other:
+You can increase the speed at which it scans large networks by increasing
+the number of workers:
 
-    masscan 10.0.0.0/8 -p3389 --rate 1000000 | rdpscan --file -
-    
-You can get more verbose diagnostic details using the `-d` parameter, which gets
-printed to `sterr`. This is how I usually run the program:
+    rdpscan --workers 10000 10.0.0.0/8
 
-    rdpscan --file ips.txt 2> diag.txt 1> results.txt
-    
+However, on my computer, it only produces about 1500 workers, because
+of system limitations, no matter how high I configure this parameter.
+
+You can increase the speed even more by using this in conjunction
+with `masscan`, described in the second below.
+
+## Interpreting the results
+
+There are three general responses:
+    - *SAFE* - which means the target is probably patched or otherwise
+        not vulnerable to the bug.
+    - *VULNERABLE*: which means we've confirmed the target is vulnerable
+        to this bug, and that when the worm hits, will likely get
+        infected.
+    - *UNKNOWN*: means we can't confirm either way, usually because
+        the target doesn't respond or isn't running RDP, which is
+        the vast majority of responses. Also, when targets are out
+        of resources or experiencing network problems, we'll get
+        a lot of these. Finally, protocol errors are responsble
+        for a lot.
+While the three main responses are *SAFE*, *VULNERABLE*, and *UNKNOWN*,
+they contain additional text explaining the diagnosis. This section
+describes the various strings you'll see.
+
+### SAFE
+
+There are three main reaons we think a target is safe:
+ - *SAFE - Target appears patched*
+    This happens when the target doesn't respond to the triggering
+    request. This means it's a Windows system that's been patched,
+    or a system that wasn't vulnerable to begin with, like Windows 10
+    or Unix.
+ - *SAFE - CredSSP/NLA required* 
+    This means that the target first requires Network Level Authentication before
+    the RDP connection can be established. The tool cannot pass this point, without
+    leigitimate credentials, so cannot determine whether the target has been patched.
+    However, hackers can't continue past this point to exploit vulnerable systems, either,
+    so you are likely "safe". However, when exploits appear, insiders with valid
+    usernames/passwords will be able to exploit the system if it's un-patched.
+ - *SAFE - not RDP*
+    This means the system is not RDP, but has some other service that happens to use
+    this same port, and produces a response that's clearly not RDP. Common examples are
+    HTTP and SSH. Note however that instead of an identifiable protocol, a server 
+    may respond with a RST or FIN packet. These are identified as *UNKNOWN* instead
+    of *SAFE*/
+
+### VULNERABLE
+
+This means we've confirmed the system is vulnerable  to the bug.
+  - *VULNERABLE - got appid*
+    There is only one response when the system is vulnerable, this one.
+
+### UNKNOWN
+
+There are a zillion variations for unknown
+
+  - *UNKNOWN - no connection - timeout*
+    This is by far the most common response, and happens when the target
+    IP address makes no response whatsoever. In fact, it's so common that
+    when scanning large ranges of addresses, it's usually ommited. You
+    have to add the *-v* (verbose) flag in order to enable it.
+  - *UNKNOWN - no connection - refused (RST)*
+    This is by far the second most common response, and happens when
+    the target exists and responds to network traffic, but isn't running
+    RDP, so refuses the connection with a TCP RST packet.
+  - *UNKNOWN - RDP protocol error - receive timeout*
+    This is the third most common response, and happens when we've successfully
+    established an RDP connection, but then the server stops responding
+    to us. This is due to network errors and when the target system is
+    overloaded for some reason. It could also be network errors on this
+    end, such as when you are behind a NAT and overloading it with too
+    many connections.
+  - *UNKNOWN - no connection - connection closed*
+    This means we've established a connection (TCP SYN-ACK), but then
+    the connection is immediately closed (with a RST or FIN). There are
+    many reasons this happen, which we cannot distinguish:
+        - It's running RDP, but for some reason closes the connection,
+          possibly because it's out-of-resources.
+        - It's not RDP, and doesn't like the RDP request we send it,
+          so instad of sending us a nice error message (which would
+          trigger *SAFE - not RDP*), it abruptly closes the connection.
+        - Some intervening device, like an IPS, firewall, or NAT closed
+          the connection because it identified this as hostile, or
+          ran out of resources.
+        - Some other reason I haven't identified, there's a lot of 
+          weird stuff happening when I scan the Internet.
+  - *UNKNOWN - no connection - host unreachable (ICMP error)*
+    The remote network reports the host cannot be reached or is not running.
+    Try again later if you think that host should be alive.
+  - *UNKNOWN - no connection - network unreachable (ICMP error)*
+    There is a (transient) network error on the far end, try again
+    later if you  believe that network should be running.
+  - *UNKNOWN - RDP protocol error*
+    This means some corruption happened in the RDP protocol, either because
+    the remote side implents it wrong (not a Windows system), because it's
+    handling a transient network error badly, or something else.
+  - *UNKNOWN - SSL protocol error*
+    Since Windows Vista, RDP uses the STARTTLS protocol to run over SSL.
+    This layer has it's own problems like above, which includes handling
+    underlying network errors badly, or trying to communicate with
+    systems that have some sort of incompatibility. If you get a very
+    long error message here (like SSL3_GET_RECORD:wrong version), it's
+    because the other side has a bug in SSL, or your own SSL library that
+    you are using has a bug.
+
+
+## Using with masscan
+
+This `rdpscan` tool is fairly slow, only scanning a few hundred targets per second.
+You can instead use [`masscan`](https://github.com/robertdavidgraham/masscan) to speed things up.
+The `masscan` tool is roughly 1000 times faster, but only gives limited information
+on the target.
+
+The steps are:
+  * First scan the address ranges with masscan to quickly find hosts that
+    respond on port 3389 (or whatever port you use).
+  * Second feed the output of `masscan` into  `rdpscan`, so it only has
+    to scan targets we know are active.
+
+The simple way to run this is just to combine them on the command-line:
+
+    masscan 10.0.0.0/8 -p3389 | rdpscan --file -
+
+The way I do it is in two steps:
+
+    masscan 10.0.0.0/8 -p3389 > ips.txt
+    rdpscan --file ips.txt --workers 10000 >results.txt
+
 
 ## Building
 
@@ -161,40 +282,34 @@ blank lines ignored, any any comment lines are ignored. A *comment* is
 a line starting with the `#` character, or `//` characters.
 
 The output is sent to `stdout` giving the status of  VULNERABLE, SAFE, 
-or UNKNOWN. There could be additional reasons for each.
+or UNKNOWN. There could be additional reasons for each. These reasons
+are described above.
 
-    149.129.120.24  - UNKNOWN - FIN received
-    45.60.213.160   - SAFE - not RDP but HTTP
-    208.43.229.89   - SAFE - CredSSP required
-    170.104.127.137 - UNKNOWN - FIN received
-    86.188.190.117  - UNKNOWN - connect timeout
-    62.15.34.157    - SAFE - Target appears patched
-    216.15.251.120  - VULNERABLE -- got appid
-    69.62.158.174   - VULNERABLE -- got appid
-    92.111.20.13    - SAFE - Target appears patched
+    211.101.37.250 - SAFE - CredSSP/NLA required
+    185.11.124.79 - SAFE - not RDP - SSH response seen
+    125.121.137.42 - UNKNOWN - no connection - refused (RST)
+    40.117.191.215 - SAFE - CredSSP/NLA required
+    121.204.186.182 - SAFE - CredSSP/NLA required
+    99.8.11.148 - SAFE - CredSSP/NLA required
+    121.204.186.114 - SAFE - CredSSP/NLA required
+    49.50.145.236 - SAFE - CredSSP/NLA required
+    106.12.74.155 - VULNERABLE - got appid
+    222.84.253.26 - SAFE - CredSSP/NLA required
+    144.35.133.109 - UNKNOWN - RDP protocol error - receive timeout
+    199.212.226.196 - UNKNOWN - RDP protocol error - receive timeout
+    183.134.58.152 - UNKNOWN - no connection - refused (RST)
+    83.162.246.149 - VULNERABLE - got appid
 
 You can process this with additional unix commands like `grep` and `cut`.
-To get a list of just vulnerable machiens:
+To get a list of just vulnerable machines:
 
     ./rdpscan 10.0.0.0/8 | grep 'VULN' | cut -f1 -d'-'
-    
-Those marked "UNKNOWN" are probably worth scanning later, especially
-for "FIN received", which usually means the other side terminated the connection
-early because of delay on the Internet. Save them into a file, and then read
-back on the next scan with the `--file` option.
 
-Whether "CredSSP required" (meaning NLA required) is "SAFE" is debatable.
-It means it requires a password
-login *before* we can test/trigger the vuln. It may be unpatched and vulnerable to
-an authenticated user, it's just not exploitable by a worm or unauthenticated user.
+The parameter `-dddd` means *diagnostic* information, where the more `d`s you
+add, the more details are printed. This is sent to `stderr` instead of `stdout`
+so that you can separate the streams. Using `bash` this is done like this:
 
-You *should* always get one-and-only-one status on `stdout` for each IP address
-you scan. Of course, if you specify an IP address multiple times, you'll get multiple
-statuses for that address.
-
-However, because this code is based on `rdestkop`, there are certain protocol
-errors that won't lead to a status. If you've got a public IP address on the Internet
-that produces one of these errors, then I'm eager to fix it.
+    ./rdpscan --file myips.txt -ddd 2> diag.txt 1> results.txt
 
 
 ## Diagnostic info
