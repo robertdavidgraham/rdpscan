@@ -203,6 +203,40 @@ tcp_send(STREAM s)
 #endif
 }
 
+/**
+ * Return an SSL error string.
+ */
+static char *
+my_ssl_error_string(void)
+{ 
+    size_t length;
+    char *buf;
+    char *ptr = NULL;
+    BIO *bio;
+    
+    /* Create an SSL I/O stream to use */
+    bio = BIO_new(BIO_s_mem());
+
+    /* Format the most recent error (stored in the SSL 
+     * thread-local data structures) */
+    ERR_print_errors(bio);
+
+    /* Get a pointer to the BIO's internal buffer, as
+     * as well as the current length */
+    length = BIO_get_mem_data(bio, &ptr);
+
+    /* Create a copy of error message, using our own
+     * memory allocation routines */
+    buf = malloc(length + 1);
+    if (buf)
+        memcpy(buf, ptr, length);
+
+    /* Now free SSL's I/O stream */
+    BIO_free (bio);
+
+    return buf;
+}
+
 /* Receive a message on the TCP layer */
 STREAM
 tcp_recv(STREAM s, uint32 length)
@@ -321,13 +355,21 @@ tcp_recv(STREAM s, uint32 length)
 				if (SSL_get_shutdown(g_ssl) & SSL_RECEIVED_SHUTDOWN)
 				{
 					STATUS(0, "Remote peer initiated ssl shutdown.\n");
-                    RESULT("UNKNOWN - SSL - network error\n");
+                    RESULT("UNKNOWN - SSL protocol error - network error\n");
                     return NULL;
 				}
-
-				ERR_print_errors_fp(stdout);
-				g_network_error = True;
-				return NULL;
+                else
+                {
+                    //ERR_print_errors_fp(stdout);
+				
+                    /* Some unknown internal error happened within SSL.
+                     * Therefore, we need to print this as a result */
+                    char *err_msg = my_ssl_error_string();
+                    RESULT("UNKNOWN - SSL protocol error - %s\n", err_msg);
+                    free(err_msg);
+    				g_network_error = True;
+	    			return NULL;
+                }
 			}
 
 			if (ssl_err == SSL_ERROR_WANT_READ || ssl_err == SSL_ERROR_WANT_WRITE)
@@ -358,7 +400,7 @@ tcp_recv(STREAM s, uint32 length)
                             if (g_connect_retries <= 1) {
                                 RESULT("UNKNOWN - no connection - connection closed (RST)\n");
                             } else {
-                                sleep(5);
+                                $sleep(5);
                                 g_connect_retries--;
                                 return NULL;
                             }
@@ -387,7 +429,7 @@ tcp_recv(STREAM s, uint32 length)
                     RESULT("UNKNOWN - no connection - connection closed (FIN)\n");
                 } else {
                     /* Loop around again and retry the connection again a few times */
-                    sleep(5);
+                    $sleep(5);
                     g_connect_retries--;
                 }
 				return NULL;
@@ -483,7 +525,13 @@ tcp_tls_connect(void)
 	while (SSL_get_error(g_ssl, err) == SSL_ERROR_WANT_READ);
 	if (err < 0)
 	{
-		ERR_print_errors_fp(stdout);
+        //ERR_print_errors_fp(stdout);
+				
+        /* Some unknown internal error happened within SSL.
+            * Therefore, we need to print this as a result */
+        char *err_msg = my_ssl_error_string();
+        RESULT("UNKNOWN - SSL protocol error - %s\n", err_msg);
+        free(err_msg);
 		goto fail;
 	}
 
@@ -602,7 +650,7 @@ sockets_connect(const char *target, unsigned port)
     if (err)
     {
         STATUS(0, "[-] getaddrinfo() failed: %s\n", gai_strerror(err));
-        RESULT("UNKNOWN - name resolution failed\n");
+        RESULT("UNKNOWN - no connection - DNS name resolution failed\n");
         return -1;
     }
     
@@ -689,6 +737,10 @@ sockets_connect(const char *target, unsigned port)
                         case $ECONNREFUSED:
                             STATUS(1, "[-] connect refused\n");
                             RESULT("UNKNOWN - no connection - refused (RST)\n");
+                            break;
+                        case $ECONNRESET:
+                            STATUS(1, "[-] connect reset\n");
+                            RESULT("UNKNOWN - no connection - connection closed (RST)\n");
                             break;
                         case $ENETUNREACH:
                             STATUS(1, "[-] connect ICMP net unreachable\n");
