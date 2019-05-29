@@ -24,7 +24,7 @@ This is only a few days old and experimental. However, I am testing it by scanni
 the entire Internet (with the help of `masscan`, so I'm working through a lot of problems
 pretty quickly. You can try contacting me on twttier(@erratarob) for help/comments.
 
- - 2019-05-38 - Better output classification
+ - 2019-05-38 - Better output result descriptions, as well as documentation what they mean (see below).
  - 2019-05-27 - Windows and macOS binaries released (click on badges above).
  - 2019-05-26 - fixing the Windows networking issues
  - 2019-05-25 - Linux and macOS working well, Windows has a few network errors
