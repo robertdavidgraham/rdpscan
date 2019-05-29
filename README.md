@@ -38,9 +38,9 @@ pretty quickly. You can try contacting me on twttier(@erratarob) for help/commen
     rdpscan 192.168.1.1-192.168.1.255
     
 This produces one of 3 results for each address:
-    - SAFE - if target has determined bot be *patched* or at least require *CredSSP/NLA*
-    - VULNERABLE - if the target has been confirmed to be vulnerable
-    - UNKNOWN - if the target doesn't respond or has some protocol failure
+  - SAFE - if target has determined bot be *patched* or at least require *CredSSP/NLA*
+  - VULNERABLE - if the target has been confirmed to be vulnerable
+  - UNKNOWN - if the target doesn't respond or has some protocol failure
 
 When nothing exists at a target IP address, the older versions pritned the
 message "*UNKNOWN - connection timed out*". When scanning large networks,
@@ -62,12 +62,12 @@ with `masscan`, described in the second below.
 ## Interpreting the results
 
 There are three general responses:
-    - *SAFE* - which means the target is probably patched or otherwise
+  - *SAFE* - which means the target is probably patched or otherwise
         not vulnerable to the bug.
-    - *VULNERABLE*: which means we've confirmed the target is vulnerable
+  - *VULNERABLE*: which means we've confirmed the target is vulnerable
         to this bug, and that when the worm hits, will likely get
         infected.
-    - *UNKNOWN*: means we can't confirm either way, usually because
+  - *UNKNOWN*: means we can't confirm either way, usually because
         the target doesn't respond or isn't running RDP, which is
         the vast majority of responses. Also, when targets are out
         of resources or experiencing network problems, we'll get
@@ -129,15 +129,15 @@ There are a zillion variations for unknown
     This means we've established a connection (TCP SYN-ACK), but then
     the connection is immediately closed (with a RST or FIN). There are
     many reasons this happen, which we cannot distinguish:
-        - It's running RDP, but for some reason closes the connection,
+    - It's running RDP, but for some reason closes the connection,
           possibly because it's out-of-resources.
-        - It's not RDP, and doesn't like the RDP request we send it,
+     - It's not RDP, and doesn't like the RDP request we send it,
           so instad of sending us a nice error message (which would
           trigger *SAFE - not RDP*), it abruptly closes the connection.
-        - Some intervening device, like an IPS, firewall, or NAT closed
+     - Some intervening device, like an IPS, firewall, or NAT closed
           the connection because it identified this as hostile, or
           ran out of resources.
-        - Some other reason I haven't identified, there's a lot of 
+     - Some other reason I haven't identified, there's a lot of 
           weird stuff happening when I scan the Internet.
   - *UNKNOWN - no connection - host unreachable (ICMP error)*
     The remote network reports the host cannot be reached or is not running.
