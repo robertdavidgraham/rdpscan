@@ -525,7 +525,13 @@ tcp_tls_connect(void)
 	while (SSL_get_error(g_ssl, err) == SSL_ERROR_WANT_READ);
 	if (err < 0)
 	{
-		ERR_print_errors_fp(stdout);
+        //ERR_print_errors_fp(stdout);
+				
+        /* Some unknown internal error happened within SSL.
+            * Therefore, we need to print this as a result */
+        char *err_msg = my_ssl_error_string();
+        RESULT("UNKNOWN - SSL protocol error - %s\n", err_msg);
+        free(err_msg);
 		goto fail;
 	}
 
@@ -644,7 +650,7 @@ sockets_connect(const char *target, unsigned port)
     if (err)
     {
         STATUS(0, "[-] getaddrinfo() failed: %s\n", gai_strerror(err));
-        RESULT("UNKNOWN - name resolution failed\n");
+        RESULT("UNKNOWN - no connection - DNS name resolution failed\n");
         return -1;
     }
     
