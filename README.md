@@ -35,7 +35,7 @@ pretty quickly. You can try contacting me on twttier(@erratarob) for help/commen
  
  To scan a network, run it like the following:
  
-    rdpscan 192.168.1.1-192.168.1.1.255
+    rdpscan 192.168.1.1-192.168.1.255
     
 This produces one of 3 results for each address:
     - SAFE - if target has determined bot be *patched* or at least require *CredSSP/NLA*
