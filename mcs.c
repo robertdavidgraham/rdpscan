@@ -304,7 +304,7 @@ mcs_recv(uint16 * channel, uint8 * rdpver)
 		if (appid ==  MCS_DPUM)
 		{
             extern char g_targetaddr[];
-			RESULT("VULNERABLE -- got appid\n", g_targetaddr);
+			RESULT("VULNERABLE - got appid\n", g_targetaddr);
 		}
 		
 		return NULL;

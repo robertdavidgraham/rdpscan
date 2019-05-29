@@ -903,6 +903,7 @@ bitmap_decompress(uint8 * output, int width, int height, uint8 * input, int size
 			break;
 		default:
 			unimpl("Bpp %d\n", Bpp);
+            RESULT("SAFE - not windows\n");
 			break;
 	}
 	return rv;

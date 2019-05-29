@@ -109,6 +109,7 @@ iso_recv_msg(uint8 * code, uint8 * rdpver)
 	STREAM s;
 	uint16 length;
 	uint8 version;
+    extern int g_is_iso_confirmed;
 
 	s = tcp_recv(NULL, 4);
 	if (s == NULL)
@@ -121,7 +122,23 @@ iso_recv_msg(uint8 * code, uint8 * rdpver)
 		in_uint8s(s, 1);	/* pad */
 		in_uint16_be(s, length);
 	}
-	else
+    else if (s->end - s->data == 4 && memcmp(s->data, "SSH-", 4) == 0)
+    {
+        RESULT("SAFE - not RDP - SSH response seen\n");
+        return NULL;
+    }
+    else if (s->end - s->data == 4 && memcmp(s->data, "HTTP", 4) == 0)
+    {
+        RESULT("SAFE - not RDP - SSH response seen\n");
+        return NULL;
+    }
+    else if (!g_is_iso_confirmed)
+    {
+        /* This is the first response, make sure it's v3 */
+        RESULT("SAFE - not RDP - unknown response received\n");
+        return NULL;
+    }
+    else
 	{
 		in_uint8(s, length);
 		if (length & 0x80)
@@ -212,6 +229,7 @@ iso_connect(char *server, char *username, char *domain, char *password,
 	STREAM s;
 	uint8 code;
 	uint32 neg_proto;
+    extern int g_connect_retries;
 
 	g_negotiate_rdp_protocol = True;
 
@@ -226,31 +244,43 @@ iso_connect(char *server, char *username, char *domain, char *password,
 		warning("Disables CredSSP due to missing smartcard information for SSO.\n");
 #endif
 
-      retry:
+retry:
 	*selected_protocol = PROTOCOL_RDP;
 	code = 0;
 
-	if (!tcp_connect(server))
+    if (!tcp_connect(server)) {
 		return False;
+    }
 
 	iso_send_connection_request(username, neg_proto);
 
 	s = iso_recv_msg(&code, NULL);
-	if (s == NULL)
+    if (s == NULL) {
+        /* Servers that allow connctions seem to sometimes RST/FIN then
+         * at the beginning, so if that's the case, retry the connection
+         * a couple of times */
+        if (g_connect_retries)
+            goto retry;
 		return False;
+    }
 
 	if (code != ISO_PDU_CC)
 	{
 		STATUS(1, "expected CC, got 0x%x\n", code);
         if (s->end - s->data > 7 && memcmp(s->data, "HTTP/1.", 7) == 0) {
-            RESULT("SAFE - not RDP but HTTP\n");
+            RESULT("SAFE - not RDP - HTTP response seen\n");
         } else if (s->end - s->data > 7 && memcmp(s->data, "SSH-2.0", 7) == 0) {
-            RESULT("SAFE - not RDP but SSH\n");
+            RESULT("SAFE - not RDP - SSH response seen\n");
         } else
-            RESULT("SAFE - protocol error\n");
+            RESULT("SAFE - not RDP - unknown response seen\n");
 		tcp_disconnect();
 		return False;
-	}
+    } else {
+        /* Mark this as a successfull ISO COTP connection, to
+         * differentiate against other protocols */
+        extern int g_is_iso_confirmed;
+        g_is_iso_confirmed = 1;
+    }
 
 	if (g_rdp_version >= RDP_V5 && s_check_rem(s, 8))
 	{
@@ -332,7 +362,7 @@ iso_connect(char *server, char *username, char *domain, char *password,
 			}
 			/* do not use encryption when using TLS */
 			g_encryption = False;
-		    STATUS(1, "[+] SSL connection\n", g_targetaddr, g_targetport);
+            STATUS(1, "[+] connection established: using SSL\n", g_targetaddr, g_targetport);
 		}
 #ifdef WITH_CREDSSP
 		else if (data == PROTOCOL_HYBRID)
@@ -346,13 +376,13 @@ iso_connect(char *server, char *username, char *domain, char *password,
 			}
 
 			/* do not use encryption when using TLS */
-			STATUS(1, "Connection established using CredSSP.\n");
+            STATUS(1, "connection established: using CredSSP.\n");
 			g_encryption = False;
 		}
 #endif
 		else if (data == PROTOCOL_RDP)
 		{
-			STATUS(1, "[+] Connection established using plain RDP.\n");
+            STATUS(1, "[+] connection established: using plain RDP.\n");
 		}
 		else if (data != PROTOCOL_RDP)
 		{

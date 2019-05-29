@@ -152,6 +152,17 @@ rdssl_cert_to_rkey(RDSSL_CERT * cert, uint32 * key_len)
 	X509_PUBKEY *key = NULL;
 	X509_ALGOR *algor = NULL;
 
+    /* First, log the subject name, so we know more about the target
+     * that we are scanning */
+    {
+        char *name = X509_NAME_oneline(X509_get_subject_name(cert), NULL, 0);
+        if (name == NULL) {
+            STATUS(0, "RDPsec - can't get certificate subject name\n");
+        } else {
+            STATUS(1, "subject = %s\n", name);
+            OPENSSL_free(name);
+        }
+    }
 	key = X509_get_X509_PUBKEY(cert);
     
     /* (Rob) It looks like this code can't work, as the return type
@@ -169,7 +180,8 @@ rdssl_cert_to_rkey(RDSSL_CERT * cert, uint32 * key_len)
 	epk = X509_get_pubkey(cert);
 	if (NULL == epk)
 	{
-		error("Failed to extract public key from certificate\n");
+		STATUS(1, "Failed to extract public key from certificate\n");
+        RESULT("UNKNOWN - RDP protocol error - failed to extract public-key\n");
 		return NULL;
 	}
 

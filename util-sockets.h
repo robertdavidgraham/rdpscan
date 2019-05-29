@@ -50,6 +50,8 @@ extern const char *$strerror(int err);
 #define $ECONNABORTED   ECONNABORTED
 #define $ECONNREFUSED   ECONNREFUSED
 #define $EBADF          EBADF
+#define $ENETUNREACH    ENETUNREACH
+#define $EHOSTUNREACH   EHOSTUNREACH
 #define $strerror(err)  strerror(err)
 #define $errno          errno
 #define $close(fd)      close(fd)
