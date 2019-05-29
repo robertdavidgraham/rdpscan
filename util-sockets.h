@@ -31,6 +31,7 @@ extern const char *$strerror(int err);
 #define $ECONNABORTED   WSAECONNABORTED
 #define $ECONNREFUSED   WSAECONNREFUSED
 #define $EBADF          WSAEBADF
+#eefine $EACCES         WSAEACCES
 
 #else
 #include <unistd.h>		/* select read write close */
@@ -52,6 +53,7 @@ extern const char *$strerror(int err);
 #define $EBADF          EBADF
 #define $ENETUNREACH    ENETUNREACH
 #define $EHOSTUNREACH   EHOSTUNREACH
+#define $EACCES         EACCES
 #define $strerror(err)  strerror(err)
 #define $errno          errno
 #define $close(fd)      close(fd)

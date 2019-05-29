@@ -253,9 +253,9 @@ tcp_recv(STREAM s, uint32 length)
         {
             extern const unsigned MST120_TIMEOUT;
             extern time_t g_first_check;
-            extern void mst120_check(void);
+            extern void mst120_check(int);
             
-            
+            printf("%lu\n", g_first_check);
             if (g_first_check && g_first_check + MST120_TIMEOUT < time(0)) {
                 /* CVE-2019-0708
                  * We'll check this when recieving 'orders' from the other side,
@@ -263,7 +263,7 @@ tcp_recv(STREAM s, uint32 length)
                  * this. However, we only do it once the T120 timeout has passed,
                  * so that should only happen once we've reached the
                  * result=patched state */
-                mst120_check();
+                mst120_check(0);
             } else if (time(0) > timeof_last_receive + MST120_TIMEOUT*2) {
                 /* CVE-2019-0708
                  * We are finding machines on the Internet that respond to a
@@ -698,6 +698,10 @@ sockets_connect(const char *target, unsigned port)
                             STATUS(1, "[-] connect ICMP host unreachable\n");
                             RESULT("UNKNOWN - no connection - host unreachable (ICMP error)\n");
                             break;
+                        case $EACCES:
+                            STATUS(1, "[-] access denied -- probably broadcast address .0 or .255\n");
+                            RESULT("UNKNOWN - no connection - broadcast address\n");
+                            break;
                         default:
                             STATUS(1, "[-] connect failed: %s (%d) [%d]\n", $strerror(errcode), errcode, fd);
                             RESULT("UNKNOWN - no connection - failed: %s\n", $strerror(errcode));
@@ -736,10 +740,13 @@ sockets_connect(const char *target, unsigned port)
         switch ($errno) {
             case $EINTR:
             case $ETIMEDOUT:
-                RESULT("UNKNOWN - connect timeout\n");
+                RESULT("UNKNOWN - no connection - timeout\n");
                 break;
             case $ECONNREFUSED:
-                RESULT("UNKNOWN - connect refused\n");
+                RESULT("UNKNOWN - no connection - refused (RST)\n");
+                break;
+            case $EACCES:
+                RESULT("UNKNOWN - no connection - broadcast address\n");
                 break;
             default:
                 RESULT("UNKNOWN - connect failed: %s (%d) [%d]\n", $strerror($errno), $errno, fd);

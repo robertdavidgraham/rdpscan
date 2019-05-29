@@ -12,7 +12,7 @@
 #endif
 
 #define MST120_SEND_MAX 5
-const unsigned MST120_TIMEOUT = 5;  // in seconds
+const unsigned MST120_TIMEOUT = 6;  // in seconds
 
 static VCHANNEL *mst120_channel;
 static int g_check_count;
@@ -69,7 +69,7 @@ mst120_send_check_packet(size_t size, size_t offset)
 }
 
 void
-mst120_check(void)
+mst120_check(int is_send)
 {
     if (g_check_count > MST120_SEND_MAX)
     {
@@ -88,7 +88,10 @@ mst120_check(void)
         return;
     }
 
-    ++g_check_count;
-    mst120_send_check_packet(0x20, 8);
-    mst120_send_check_packet(0x10, 4);
+    if (is_send)
+    {
+        ++g_check_count;
+        mst120_send_check_packet(0x20, 8);
+        mst120_send_check_packet(0x10, 4);
+    }
 }
