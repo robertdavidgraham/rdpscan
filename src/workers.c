@@ -482,12 +482,17 @@ again:
     }
     
     if (child.pid == 0) {
+        int err;
         /* Set the 'write' end of the pipe 'stdout' */
         dup2(t->child_stdout, 1);
         dup2(t->child_stderr, 2);
         
         /* Now execute our child with new program */
-        execve(progname, new_argv, 0);
+        err = execve(progname, new_argv, 0);
+        if (err) {
+            fprintf(stderr, "[+] execve(%s) failed: %s\n", progname, strerror(errno));
+            exit(1);
+        }
     } else {
         /* we are the parent */
         ;

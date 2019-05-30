@@ -339,3 +339,82 @@ So it includes SOCKS5 support:
     ./rdpscan --file ips.txt --socks5 localhost --socks5port 9050
     
 It makes connection problems worse so you get a lot more "UNKNOWN" results.
+
+## Statically link OpenSSL
+
+For releasing the Windows and macOS binaries attached as *releases* to this project
+I statically link OpenSSL, so that it doesn't need to be included separately, and the
+programs *just work*. This section describes some notes on how to do this, especially
+since the description on OpenSSL's own page seems to be out of date.
+
+Both these steps start with downloading the OpenSSL source and putting
+it next to the `rdpscan` directory:
+
+    git clone https://github.com/openssl/openssl
+
+### Windows
+
+For Windows, you need to first install some version of Perl. I use the one
+from [ActiveState](http://www.activestate.com/ActivePerl).
+
+Next, you'll need a special "assembler". I use the recommended one called
+[NASM]( http://nasm.sourceforge.net/))
+
+Next, you'll need a compiler. I use VisualStudio 2010. You can download
+the latest "Visual Studio Community Edition" (which is 2019) instead from
+Microsoft.
+
+Now you need to build the makefile. This is done by going into the OpenSSL
+directory and running the `Configure` Perl program:
+
+    perl Configure VC-WIN32
+
+I chose 32-bit for Windows because there's a lot of old Windows out there,
+and I want to make the program as compaitble as possible with old versions.
+
+I want a completely static build, including the C runtime. To do that, I opened
+the resulting makefile in an editor, and changed the C compilation flag from
+`/MD` (meaning use DLLs) to `/MT`.
+
+Now you'll need to make sure everything is in your path. I copied `nasm.exe` 
+to the a directory in the PATH. For Visual Studio 2010, I ran the program
+`vcvars32.bat` to setup the path variables for the compiler.
+
+At this point on the command-line, I typed:
+
+    nmake
+
+This makes the libraries. The static ones are `libssl_static.lib` and `libcrypto_static.lib`,
+which I use to link to in `rdpscan`.
+
+### macOS
+    
+First of all, you need to install a compiler. I use the Developer Tools from Apple, installing
+XCode and the compiler. I think you can use Homebrew to install `gcc` instead.
+
+Then go int othe source directory for OpenSSL and create a makefile:
+
+    perl Configure darwin64-x86_64-cc
+
+Now simply make it:
+
+    make depend
+    make
+    
+At this point, it's created both dynamic (`.dylib`) and static (`.lib`) libraries. I deleted
+the dynamic libraries so that it'll catch the static ones by default.
+
+Now in `rdpscan`, just build the macOS makefile:
+
+    make -f Makefile.macos
+    
+This will compile all the `rdpscan` source files, then link to the OpenSSL libraries
+in the directory `../openssl` that you just built.
+
+This should produce a 3-megabyte exexeutable. If you instead only got a
+200-kilobyte executable, then you made a mistake and linked to the dynamic libraries
+instead.
+
+
+
+
