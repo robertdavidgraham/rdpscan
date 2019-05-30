@@ -1,6 +1,6 @@
 
 
-rdpscan: *.c *.h
-	gcc -g -O1 *.c -lssl -lcrypto -o rdpscan
+rdpscan: src/*.c src/*.h
+	gcc -g -O1 src/*.c -lssl -lcrypto -o rdpscan
 
 
