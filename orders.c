@@ -370,7 +370,7 @@ process_rect(STREAM s, RECT_ORDER * os, uint32 present, RD_BOOL delta)
 		os->colour = (os->colour & 0xff00ffff) | (i << 16);
 	}
 
-	DEBUG(("RECT(x=%d,y=%d,cx=%d,cy=%d,fg=0x%x)\n", os->x, os->y, os->cx, os->cy, os->colour));
+	STATUS(7, "RECT(x=%d,y=%d,cx=%d,cy=%d,fg=0x%x)\n", os->x, os->y, os->cx, os->cy, os->colour);
 
 	//ui_rect(os->x, os->y, os->cx, os->cy, os->colour);
 }
@@ -451,8 +451,8 @@ process_memblt(STREAM s, MEMBLT_ORDER * os, uint32 present, RD_BOOL delta)
     mst120_check(1);
 
 
-	DEBUG(("MEMBLT(op=0x%x,x=%d,y=%d,cx=%d,cy=%d,id=%d,idx=%d)\n",
-	       os->opcode, os->x, os->y, os->cx, os->cy, os->cache_id, os->cache_idx));
+	STATUS(7, "MEMBLT(op=0x%x,x=%d,y=%d,cx=%d,cy=%d,id=%d,idx=%d)\n",
+	       os->opcode, os->x, os->y, os->cx, os->cy, os->cache_id, os->cache_idx);
 
     bitmap = NULL; //cache_get_bitmap(os->cache_id, os->cache_idx);
 	if (bitmap == NULL)
@@ -1325,6 +1325,7 @@ process_orders(STREAM s, uint16 num_orders)
 	uint8 order_flags;
 	int size, processed = 0;
 	RD_BOOL delta;
+    static unsigned order_count = 0;
 
 	while (processed < num_orders)
 	{
@@ -1382,10 +1383,16 @@ process_orders(STREAM s, uint16 num_orders)
 
 			delta = order_flags & RDP_ORDER_DELTA;
 
+            /* This section is just for debug purposes */
+            switch (os->order_type)
             {
-                static unsigned count = 0;
-                STATUS(5, "[+] %5u order = %u\n", count++, os->order_type);
+                case 10: /* rect */
+                case 13: /* memblt */
+                    break;
+                default:
+                    STATUS(5, "[+] %5u order #%u %u-bytes\n", order_count++, os->order_type, s->end - s->data);
             }
+            
             switch (os->order_type)
 			{
 				case RDP_ORDER_DESTBLT:

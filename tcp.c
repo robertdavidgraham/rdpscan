@@ -191,6 +191,7 @@ tcp_send(STREAM s)
 #endif
 
 					error("send: %s\n", $strerror($errno));
+                    RESULT("UNKNOWN - RDP protocol error - connection reset\n");
 					g_network_error = True;
 					return;
 				}
@@ -289,7 +290,6 @@ tcp_recv(STREAM s, uint32 length)
             extern time_t g_first_check;
             extern void mst120_check(int);
             
-            printf("%lu\n", g_first_check);
             if (g_first_check && g_first_check + MST120_TIMEOUT < time(0)) {
                 /* CVE-2019-0708
                  * We'll check this when recieving 'orders' from the other side,

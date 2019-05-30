@@ -585,6 +585,7 @@ sec_parse_crypt_info(STREAM s, uint32 * rc4_key_size,
 	in_uint32_le(s, flags);	/* 1 = RDP4-style, 0x80000002 = X.509 */
 	if (flags & 1)
 	{
+        STATUS(3, "RDP4 encryption w/ RSA and RC4\n");
 		DEBUG_RDP5(("We're going for the RDP4-style encryption\n"));
 		in_uint8s(s, 8);	/* unknown */
 
@@ -619,7 +620,7 @@ sec_parse_crypt_info(STREAM s, uint32 * rc4_key_size,
 	else
 	{
 		uint32 certcount;
-
+        STATUS(3, "RDP5 encryption w/ certificate\n");
 		DEBUG_RDP5(("We're going for the RDP5-style encryption\n"));
 		in_uint32_le(s, certcount);	/* Number of certificates */
 		if (certcount < 2)
