@@ -374,7 +374,10 @@ and I want to make the program as compaitble as possible with old versions.
 
 I want a completely static build, including the C runtime. To do that, I opened
 the resulting makefile in an editor, and changed the C compilation flag from
-`/MD` (meaning use DLLs) to `/MT`.
+`/MD` (meaning use DLLs) to `/MT`. While I was there, I added the following 
+to the CPPFLAGS `-D_WIN32_WINNT=0x501`, which restrict OpenSSL to features that
+work back on Windows XP and Server 2003. Otherwise, you get errors that `bcrypt.dll`
+was not found if your run on those older systems.
 
 Now you'll need to make sure everything is in your path. I copied `nasm.exe` 
 to the a directory in the PATH. For Visual Studio 2010, I ran the program
