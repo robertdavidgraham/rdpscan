@@ -4,6 +4,7 @@
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <time.h>
 
 #ifdef WIN32
 #include <malloc.h> /* alloca() */
@@ -21,6 +22,22 @@ RESULT(const char *format, ...)
     char *newfmt;
     int newfmt_length;
     int x;
+    char datetime[128];
+    time_t now = time(0);
+    struct tm *tm = NULL;
+    extern int g_is_gmtime;
+    extern int g_is_localtime;
+
+
+    if (g_is_gmtime) {
+        tm = gmtime(&now);
+    } else if (g_is_localtime)
+        tm = localtime(&now);
+
+    if (tm)
+        strftime(datetime, sizeof(datetime), "%Y-%m-%d %H:%M:%S - ", tm);
+    else
+        datetime[0] = '\0';
     
     /* We want a single atomic write, due to multiple processes trying
      * to write output at the same time. Therefore, instead of multiple
@@ -29,6 +46,7 @@ RESULT(const char *format, ...)
     newfmt_length = 14+1; /* strlen("[-] []: - ") */
     newfmt_length += (int)strlen(g_targetaddr);
     newfmt_length += (int)strlen(format);
+    newfmt_length += (int)strlen(datetime);
     
     /* Kludge: format string attack protection */
     {
@@ -41,7 +59,7 @@ RESULT(const char *format, ...)
     
     /* Create the new format string */
     newfmt = alloca(newfmt_length);
-    x = snprintf(newfmt, newfmt_length, "%s - %s", g_targetaddr, format);
+    x = snprintf(newfmt, newfmt_length, "%s%s - %s", datetime, g_targetaddr, format);
     
     /* Now do the single atomi print */
     va_start(ap, format);

@@ -194,7 +194,8 @@ void
 rangelist_sort(struct RangeList *targets);
 
 
-
+int
+my_aton4(const char *host, unsigned char *addr, size_t sizeof_addr);
 
 
 #endif

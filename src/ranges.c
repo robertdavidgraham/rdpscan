@@ -743,6 +743,29 @@ rangelist_optimize(struct RangeList *targets)
 }
 
 
+int
+my_aton4(const char *host, unsigned char *addr, size_t sizeof_addr)
+{
+    struct Range range;
+    unsigned offset = 0;
+    unsigned max = (unsigned)strlen(host);
+
+    if (sizeof_addr < 4)
+        return 0; /*fail */
+
+    range = range_parse_ipv4(host, &offset, max);
+    if (range.begin != range.end)
+        return 0;
+    if (host[offset] != '\0')
+        return 0;
+
+    addr[0] = (unsigned char)(range.begin>>24);
+    addr[1] = (unsigned char)(range.begin>>16);
+    addr[2] = (unsigned char)(range.begin>> 8);
+    addr[3] = (unsigned char)(range.begin>> 0);
+
+    return 1;
+}
 
 
 

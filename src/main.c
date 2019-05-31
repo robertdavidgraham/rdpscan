@@ -23,6 +23,10 @@ char g_hostname[16] = "rdpscan";
 int g_result_quiet = 0;
 int g_result_verbose = 0;
 
+/* Whether or not we should print the date/time on resuls */
+int g_is_gmtime = 0;
+int g_is_localtime = 0;
+
 uint8 g_static_rdesktop_salt_16[16] = {
     0xb8, 0x82, 0x29, 0x31, 0xc5, 0x39, 0xd9, 0x44,
     0x54, 0x15, 0x5e, 0x14, 0x71, 0x38, 0xd5, 0x4d
@@ -317,6 +321,10 @@ set_parameter(struct command_line *cfg, int argc, char *argv[], int *index)
         cfg->list_filename = xstrdup(arg);
     } else if (MATCH(arg, "--help")) {
         print_help();
+    } else if (MATCH(arg, "--gmtime")) {
+        g_is_gmtime = 1;
+    } else if (MATCH(arg, "--localtime")) {
+        g_is_localtime = 1;
     } else if (MATCH(arg, "--socks5")) {
         arg = next_arg(argc, argv, index);
         g_socks5_server = xstrdup(arg);

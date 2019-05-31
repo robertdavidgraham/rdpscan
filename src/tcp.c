@@ -24,6 +24,8 @@
 #include "util-xmalloc.h"
 #include "util-log.h"
 #include "util-time.h"
+#include "ranges.h"
+#include "ranges6.h"
 #include <ctype.h>
 #include <string.h>
 
@@ -949,18 +951,20 @@ socks5_connect(const char *socks_host, unsigned socks_port,
     ssize_t length;
     size_t offset;
     enum {Ver4=1, VerDNS=3, Ver6=4} ip_version = VerDNS;
-    struct in_addr ipv4 = {0};
-    struct in6_addr ipv6 = {0};
+    unsigned char my_ipv4[4];
+    unsigned char my_ipv6[16];
     size_t i;
     char bindaddr[64];
     char bindport[8];
     unsigned port;
     
     /* First, we need to figure out whether we have an IPv4 address,
-     * an IPv6 address, or a DNS name */
-    if (inet_pton(AF_INET, target_host, &ipv4)) {
+     * an IPv6 address, or a DNS name. We can't use 'getaddrinfo()'
+     * for this because we are relying upon the Socks server to 
+     * do DNS lookups. */
+    if (my_aton4(target_host, my_ipv4, sizeof(my_ipv4))) {
         ip_version = Ver4;
-    } else if (inet_pton(AF_INET6, target_host, &ipv6)) {
+    } else if (my_aton6(target_host, my_ipv6, sizeof(my_ipv6))) {
         ip_version = Ver6;
     } else
         ip_version = VerDNS;
@@ -1018,12 +1022,16 @@ socks5_connect(const char *socks_host, unsigned socks_port,
     offset = 4;
     switch (ip_version) {
         case Ver4:
-            for (i=0; i<4; i++)
-                buf[offset++] = ((unsigned char *)(&ipv4.s_addr))[i];
+            for (i=0; i<4; i++) {
+                buf[offset] = my_ipv4[offset];
+                offset++;
+            }
             break;
         case Ver6:
-            for (i=0; i<16; i++)
-                buf[offset++] = ipv6.s6_addr[i];
+            for (i=0; i<16; i++) {
+                buf[offset] = my_ipv6[offset];
+                offset++;
+            }
             break;
         case VerDNS:
             for (i=0; target_host[i]; i++)
@@ -1056,16 +1064,24 @@ socks5_connect(const char *socks_host, unsigned socks_port,
     switch (buf[3]) {
         case Ver4:
             fd = socks_receive(fd, buf+4, 4 + 2);
-            ipv4.s_addr = *(unsigned*)(buf+4);
             port = buf[8]<<8 | buf[9];
-            inet_ntop(AF_INET, &ipv4, bindaddr, sizeof(bindaddr));
+            snprintf(bindaddr, sizeof(bindaddr), "%u.%u.%u.%u",
+                buf[4], buf[5], buf[6], buf[7]);
             snprintf(bindport, sizeof(bindport), "%u", port);
             break;
         case Ver6:
             fd = socks_receive(fd, buf+4, 16 + 2);
-            memcpy(ipv6.s6_addr, buf+4, 16);
             port = buf[20]<<8 | buf[21];
-            inet_ntop(AF_INET6, &ipv6, bindaddr, sizeof(bindaddr));
+            snprintf(bindaddr, sizeof(bindaddr), "%x:%x:%x:%x:%x:%x:%x:%x",
+                buf[4]<<8 | buf[5], 
+                buf[6]<<8 | buf[7], 
+                buf[8]<<8 | buf[9], 
+                buf[10]<<8 | buf[11], 
+                buf[12]<<8 | buf[13], 
+                buf[14]<<8 | buf[15], 
+                buf[16]<<8 | buf[17], 
+                buf[18]<<8 | buf[19]
+                );
             snprintf(bindport, sizeof(bindport), "%u", port);
             break;
         default:
