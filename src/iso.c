@@ -228,13 +228,23 @@ iso_connect(char *server, char *username, char *domain, char *password,
 {
 	STREAM s;
 	uint8 code;
-	uint32 neg_proto;
+	uint32 neg_proto = 0;
     extern int g_connect_retries;
-
+    extern int g_is_credssp_enabled;
+    extern int g_is_ssl_enabled;
+    
 	g_negotiate_rdp_protocol = True;
 
-	neg_proto = PROTOCOL_SSL;
+    /* By default, this is true, SSL is enabled by default unless
+     * '--nossl' is configured on the command-line */
+    if (g_is_ssl_enabled)
+        neg_proto |= PROTOCOL_SSL;
 
+    /* By default, this is false, CredSSP/NLA is disabled by default
+     * unless '--credssp' is enabled on the command-line */
+    if (g_is_credssp_enabled)
+        neg_proto |= PROTOCOL_HYBRID;
+    
 #ifdef WITH_CREDSSP
 	if (!g_use_password_as_pin)
 		neg_proto |= PROTOCOL_HYBRID;

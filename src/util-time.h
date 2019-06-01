@@ -4,6 +4,6 @@
 /**
  * Get a relative elapsed timestamp, in nanoseconds
  */
-unsigned long long util_nanotime(void);
+unsigned long long util_microtime(void);
 
 #endif

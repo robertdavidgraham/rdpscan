@@ -27,6 +27,15 @@ int g_result_verbose = 0;
 int g_is_gmtime = 0;
 int g_is_localtime = 0;
 
+/* Whether to enable CredSSP/NLA on the connection. By enabling
+ * this, we can grab information about the domain on the other
+ * side */
+int g_is_credssp_enabled = 0;
+
+/* Whether to enable SSL as an encrypted transport. The default
+ * behavior is to enable it. */
+int g_is_ssl_enabled = 1;
+
 uint8 g_static_rdesktop_salt_16[16] = {
     0xb8, 0x82, 0x29, 0x31, 0xc5, 0x39, 0xd9, 0x44,
     0x54, 0x15, 0x5e, 0x14, 0x71, 0x38, 0xd5, 0x4d
@@ -179,11 +188,11 @@ is_ipv4_range(const char *addr)
 static char *
 randomize_username(void)
 {
-    unsigned long long x = util_nanotime();
+    unsigned long long x = util_microtime();
     size_t i;
     char *result;
 
-     result = xmalloc(10);
+    result = xmalloc(10);
 
     for (i=0; i<8 && x; i++, x /= 32) {
         static const char chars[] = "abcdfghijklmnopqrsuvwxyz0123456789";
@@ -325,6 +334,13 @@ set_parameter(struct command_line *cfg, int argc, char *argv[], int *index)
         g_is_gmtime = 1;
     } else if (MATCH(arg, "--localtime")) {
         g_is_localtime = 1;
+    } else if (MATCH(arg, "--credssp")) {
+        g_is_credssp_enabled = 1;
+    } else if (MATCH(arg, "--nossl")) {
+        g_is_ssl_enabled = 0;
+    } else if (MATCH(arg, "--noencrypt")) {
+        g_encryption_initial = False;
+        g_encryption = False;
     } else if (MATCH(arg, "--socks5")) {
         arg = next_arg(argc, argv, index);
         g_socks5_server = xstrdup(arg);
