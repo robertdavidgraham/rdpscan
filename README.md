@@ -185,9 +185,13 @@ The way I do it is in two steps:
 ## Building
 
 The difficult part is getting the *OpenSSL* libraries installed, and not conflicting
-with other versions on the system. On Debian Linux, I do:
+with other versions on the system. Some examples for versions of Linux I've tested on
+are the following, but they keep changing package names from one distribution to
+the next. Also, there are many options for an OpenSSL-compatible API, such as BoringSSL
+and LibreSSL.
 
     $ sudo apt install libssl-dev
+    $ sudo yum install openssl-devel
 
 Once you've solved that problem, you just compile all the `.c` files together
 like this:
