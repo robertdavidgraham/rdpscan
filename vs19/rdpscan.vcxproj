@@ -167,6 +167,7 @@
     <ClCompile Include="..\src\orders.c" />
     <ClCompile Include="..\src\rand-blackrock.c" />
     <ClCompile Include="..\src\ranges.c" />
+    <ClCompile Include="..\src\ranges6.c" />
     <ClCompile Include="..\src\rdp.c" />
     <ClCompile Include="..\src\rdp5.c" />
     <ClCompile Include="..\src\secure.c" />
@@ -189,6 +190,7 @@
     <ClInclude Include="..\src\proto.h" />
     <ClInclude Include="..\src\rand-blackrock.h" />
     <ClInclude Include="..\src\ranges.h" />
+    <ClInclude Include="..\src\ranges6.h" />
     <ClInclude Include="..\src\rdesktop.h" />
     <ClInclude Include="..\src\ssl.h" />
     <ClInclude Include="..\src\stream.h" />
