@@ -8,7 +8,7 @@
 
 This is a quick-and-dirty scanner for the CVE-2019-0708 vulnerability in Microsoft Remote Desktop.
 Right now, there are about 900,000 machines on the public Internet vulnerable to this vulnerability,
-so many are expect a worm soon like WannaCry and notPetya. Therefore, scan your networks and
+so many are to expect a worm soon like WannaCry and notPetya. Therefore, scan your networks and
 patch (or at least, enable NLA) on vulnerable systems.
 
 This is a command-line tool. You can download the source and compile it
