@@ -533,9 +533,9 @@ tcp_tls_connect(void)
     /* At this point, we are going to hand off control to OpenSSL
      * for them to establish the connection */
     timeof_ssl_start = time(0);
+    STATUS(1, "STARTTLS starting TLS ...\n");
 	do
 	{
-        STATUS(1, "STARTTLS starting TLS ...\n");
 		err = SSL_connect(g_ssl);
         if (timeof_ssl_start + g_scan_timeout < time(0)) {
             RESULT("UNKNOWN - SSL protocol error - connect timeout\n");
