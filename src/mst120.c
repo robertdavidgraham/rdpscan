@@ -12,7 +12,7 @@
 #endif
 
 #define MST120_SEND_MAX 5
-const unsigned MST120_TIMEOUT = 6;  // in seconds
+const unsigned MST120_TIMEOUT = 18;  // in seconds
 
 static VCHANNEL *mst120_channel;
 static int g_check_count;

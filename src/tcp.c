@@ -45,7 +45,7 @@ int g_connect_retries = 4;
 int g_is_iso_confirmed = 0; /* Whether we got an ISO TPKT confimration */
 char g_targetaddr[256];
 char g_targetport[8];
-int g_scan_timeout = 20;
+int g_scan_timeout = 30;
 #ifdef WITH_SCARD
 #define STREAM_COUNT 8
 #else
